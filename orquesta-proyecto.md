@@ -87,19 +87,23 @@ Validar contra el circuito real antes de soldar.
 Ranita / Gatito / Pollito --ESP-NOW cifrado (AES-GCM)--> Osito (gateway + director musical)
                                                             |  USB serial --> Laptop: sintetizador (sonido)
                                                             |  MQTTS 8883 (Wi-Fi)
-                                                         Mosquitto (laptop)  --bridge TLS (opcional)--> HiveMQ Cloud
+                                                         Mosquitto (laptop)
                                                             |
                                                          Node-RED --> Dashboard 2.0 (terapeuta)
+                                                            |  HTTPS (REST)
+                                                         Supabase (nube: historial de sesiones)
 ```
 
 - **Percepción:** sensores y actuadores de cada animal.
 - **Red:** ESP-NOW entre animales y osito; Wi-Fi solo en el osito.
-- **Middleware:** Mosquitto (en la laptop, configuración de la Práctica 4) + Node-RED. Opcional: bridge de Mosquitto a HiveMQ Cloud.
+- **Middleware:** Mosquitto (en la laptop, configuración de la Práctica 4) + Node-RED. Nube: **Supabase** (Postgres + API REST), donde Node-RED guarda el historial de sesiones.
 - **Aplicación:** dashboard de Node-RED (`@flowfuse/node-red-dashboard`, Dashboard 2.0).
 
 ### Edge vs remoto
 - **En el ESP32 (edge):** lectura de sensores, antirrebote, detección de gesto (agitar, sombra, tecla), decisión de qué nota/parte toca, secuencia de la canción, lógica de modos y Simón Dice, LEDs, buffer offline. Justificación: el sonido debe responder en < ~50 ms; si dependiera de la red se sentiría desfasado, y la música debe seguir aunque se caiga el internet.
-- **Remoto (Node-RED):** historial de sesiones, estadísticas por niño, partitura en vivo, alertas, cambio de modo desde el dashboard.
+- **Remoto (Node-RED en la laptop):** partitura en vivo, alertas, cambio de modo desde el dashboard.
+- **Remoto (Supabase, nube):** historial de sesiones y estadísticas por niño, para ver el avance entre sesiones.
+- La música nunca pasa por la nube, así que la latencia de internet no afecta el sonido; solo retrasa un poco lo que se ve en el dashboard o en el historial.
 
 ---
 
@@ -137,7 +141,7 @@ Cliente: PubSubClient sobre WiFiClientSecure (igual que Práctica 4). PubSubClie
 | `orquesta/control/modo` | Node-RED → osito | `{"id":<n>,"modo":"cancion|libre|simon","cancion":"estrellita"}` | Request |
 | `orquesta/control/modo/ack` | osito → Node-RED | `{"id":<n>,"ok":true,"modo":"cancion"}` | Response |
 | `orquesta/sync/ack` | Node-RED → osito | `{"hasta_seq":<n>}` confirma eventos recibidos para borrarlos del buffer | Response |
-| `orquesta/sesion/resumen` | Node-RED → (bridge nube) | Resumen de sesión | Pub/Sub |
+| `orquesta/sesion/resumen` | Node-RED → Node-RED (flujo que lo guarda en Supabase) | Resumen de sesión | Pub/Sub |
 
 Payload de evento (texto plano antes de cifrar):
 ```json
@@ -148,10 +152,11 @@ Payload de evento (texto plano antes de cifrar):
 ### Request/Response (justificación para el reporte)
 - **Cambio de modo con confirmación:** el dashboard necesita saber que el osito realmente cambió de modo; un publish sin respuesta no lo garantiza.
 - **Ack de sincronización:** el osito solo borra eventos de su buffer cuando Node-RED confirma que los recibió.
-- **Historial de sesión:** el dashboard consulta `GET /api/sesion/:id` (endpoint HTTP en Node-RED).
+- **Historial de sesión:** el dashboard consulta `GET /api/sesion/:id` (endpoint HTTP en Node-RED), que a su vez consulta Supabase.
+- **Supabase (HTTPS/REST):** Node-RED guarda con `POST` y consulta con `GET`; cada petición espera su respuesta (código HTTP) para saber si se guardó.
 
 ### Pub/Sub (justificación)
-Eventos continuos y estados con varios consumidores (dashboard, registro de sesión, bridge a la nube) sin que el osito sepa quién escucha.
+Eventos continuos y estados con varios consumidores (dashboard, registro de sesión, envío a Supabase) sin que el osito sepa quién escucha.
 
 ---
 
@@ -167,11 +172,12 @@ Nuevo en este proyecto:
 - **Protección contra replay:** incluir `seq` (contador monotónico) e id de nodo como **AAD** en AES-GCM; el receptor rechaza `seq` repetidos o menores al último aceptado. Aplica en ESP-NOW y en MQTT.
 - **ACLs en Mosquitto:** el usuario del osito solo publica en `orquesta/+/evento`, `orquesta/+/estado`, `orquesta/control/modo/ack`; el usuario de Node-RED solo publica en `orquesta/control/#` y `orquesta/sync/#`.
 - Opcional: `adminAuth` en el editor de Node-RED.
+- **Supabase:** la API key va en una variable de entorno de Node-RED (como `AES_KEY_HEX`), nunca en `flows.json`. RLS activado en las tablas. Los niños se guardan con alias o ID, nunca con su nombre real.
 
 ### OWASP IoT Top 10, abiertas (actualizar al final)
 - I10: sin flash encryption ni secure boot; la NVS se puede leer con la placa en la mano.
 - I4: sin OTA firmado.
-- I6: datos de sesiones de niños, sin anonimización completa.
+- I6: datos de sesiones de niños guardados en la nube (Supabase); se usan alias, pero no hay anonimización completa.
 - I3: dashboard por HTTP (y editor sin contraseña si no se agrega `adminAuth`).
 - I8: si se comparte clave/usuario entre dispositivos, no se puede revocar uno solo.
 
@@ -183,7 +189,8 @@ Nuevo en este proyecto:
 - El osito guarda los eventos en **LittleFS** (archivo de líneas JSON con `seq` y timestamp NTP) mientras no hay conexión.
 - Al reconectar, reenvía en orden. Node-RED responde `orquesta/sync/ack` con el último `seq` recibido y el osito borra hasta ahí. Node-RED descarta duplicados por `seq`.
 - Limitar el tamaño del buffer (por ejemplo, descartar lo más viejo si se llena) y documentar ese límite.
-- Opcional, segundo nivel: el bridge de Mosquitto hacia HiveMQ Cloud encola mensajes si se cae el internet de la laptop. HiveMQ usa su propia CA pública; solo el bridge la usa, el firmware no cambia.
+- Segundo nivel (laptop → Supabase): si se cae el internet de la laptop, Node-RED guarda lo pendiente (por ejemplo, en un archivo) y reintenta cada cierto tiempo hasta que Supabase confirme. Sin esto, se perderían los datos de ese tramo.
+- Nota: los proyectos gratuitos de Supabase se pausan tras varios días sin uso; abrirlo antes de la demo.
 
 Evidencia: apagar el router/hotspot a mitad de una sesión y mostrar que el dashboard recupera todos los eventos al volver.
 
@@ -238,7 +245,7 @@ WCAG a auditar:
   /pollito
   /osito          gateway, secuenciador de canciones, modos, buffer LittleFS, Sintetizador
 /nodered          flows.json (sin claves; usar variables de entorno)
-/broker           mosquitto.conf, acl, bridge (sin contraseñas)
+/broker           mosquitto.conf, acl (sin contraseñas)
 /certs            generar_certs.sh (sin claves privadas en el repo)
 /herramientas     aprovisionar.py, iniciar_nodered.sh, sintetizador.py
 .gitignore        .secrets/, *.key, passwd, credenciales.env
@@ -252,4 +259,4 @@ Código estructurado y comentado, **sin ninguna credencial visible** (requisito 
 
 - Confirmar variante final de hardware por nodo (barata u original, o mezcla: por ejemplo MPU6050 en el pollito si sobra presupuesto).
 - Canción(es) a incluir.
-- Si se hace el bridge a HiveMQ Cloud.
+- ~~Nube~~ **Decidido:** Supabase como nube (no HiveMQ ni Google Cloud). Pendiente: diseñar las tablas (sesiones, eventos, niños con alias).
