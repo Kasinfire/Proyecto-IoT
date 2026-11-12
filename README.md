@@ -1,7 +1,7 @@
-# Orquesta de animalitos — Proyecto final IoT
+# Orquesta de animalitos: Proyecto final IoT
 
 Cuatro animalitos con ESP32 que tocan juntos una canción, pensados para musicoterapia infantil.
-La especificación completa está en [`orquesta-proyecto.md`](orquesta-proyecto.md) y los requisitos, en `Proyecto Final.pdf`.
+La especificación completa está en [`orquesta-proyecto.md`](orquesta-proyecto.md).
 
 ## Estructura
 

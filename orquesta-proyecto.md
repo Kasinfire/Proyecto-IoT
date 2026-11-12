@@ -1,6 +1,6 @@
 # Proyecto final IoT: Orquesta de animalitos para musicoterapia infantil
 
-Contexto para el asistente de código. Este archivo describe el proyecto final de la materia **Internet de las Cosas** (UdeG, CUCEI, Ingeniería Informática, sección D03, 2026B). Equipo de 5 integrantes, por lo tanto se entrega **1 solución IoT**. Contamos con **4 ESP32 (clásicas, ESP32 Dev Module)**.
+Este documento describe el proyecto final de la materia **Internet de las Cosas** (UdeG, CUCEI, Ingeniería Informática, sección D03, 2026B). Equipo de 5 integrantes, por lo tanto se entrega **1 solución IoT**. Contamos con **4 ESP32 (clásicas, ESP32 Dev Module)**.
 
 Este proyecto **reutiliza la infraestructura de seguridad de la Práctica 4** (TLS con CA propia, AES-128-GCM, credenciales en NVS). Si el repo de la Práctica 4 está disponible, partir de sus archivos: `credenciales.cpp`, `cifrado_aes.cpp`, `ca_cert.h`, `certs/generar_certs.sh`, `herramientas/aprovisionar.py`, `herramientas/iniciar_nodered.sh` y el nodo function "Descifrar AES-GCM" de Node-RED.
 
