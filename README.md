@@ -7,7 +7,7 @@ La especificación completa está en [`orquesta-proyecto.md`](orquesta-proyecto.
 
 | Carpeta | Contenido |
 |---|---|
-| `firmware/comun/` | Código compartido por los 4 ESP32 (protocolo ESP-NOW, cifrado, credenciales) |
+| `firmware/libraries/OrquestaComun/` | Librería compartida por los 4 ESP32 (protocolo ESP-NOW, cifrado, credenciales) |
 | `firmware/ranita/` | 🐸 Ranita: acompañamiento |
 | `firmware/gatito/` | 🐱 Gatito: melodía |
 | `firmware/pollito/` | 🐥 Pollito: percusión |
@@ -23,3 +23,4 @@ La especificación completa está en [`orquesta-proyecto.md`](orquesta-proyecto.
 
 - **Ninguna credencial en el código** (SSID, contraseñas, claves AES). Van en `.secrets/`, que no se sube.
 - Cada quien trabaja en su propia rama y la integra a `main` con un pull request.
+- Todo el firmware sigue el [estándar de código](docs/estandar-codigo.md). En Arduino IDE, poner el *Sketchbook location* en `firmware/`.
