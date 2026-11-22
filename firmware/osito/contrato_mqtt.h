@@ -1,7 +1,7 @@
 // Tópicos y JSON de MQTT según la sección 6 de orquesta-proyecto.md. No usa Arduino.
 // Solo entiende objetos JSON planos como los de la especificación (sin anidar ni arreglos).
 //
-// Propuesto aquí, falta acordarlo con quien haga Node-RED:
+// Esto lo tengo que acordar con quien arme Node-RED:
 //   - Campos de sombra y agitar: "nivel" e "intensidad" (la especificación solo trae el de nota).
 //   - Estado de un animal: {"estado":"online"} / {"estado":"offline"}, sin RSSI: la librería
 //     no lo expone y no se cambia aquí.

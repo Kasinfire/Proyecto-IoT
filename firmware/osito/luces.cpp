@@ -8,7 +8,7 @@
 
 namespace luces {
 namespace {
-// Los LEDs van de 3.3 V al GPIO (con su resistencia): encienden con LOW y se apagan con HIGH.
+// Como van de 3.3 V al GPIO (con resistencia), LOW los prende y HIGH los apaga.
 constexpr uint8_t LED_ENCENDIDO = LOW;
 constexpr uint8_t LED_APAGADO = HIGH;
 

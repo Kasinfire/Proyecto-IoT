@@ -1,7 +1,6 @@
-// Antirrebote sin delay(): un cambio solo cuenta cuando la lectura se queda igual estable_ms.
-// No lee el pin (recibe la lectura y la hora), así se prueba en la compu.
-// Posible duplicación futura: es el mismo algoritmo que Antirrebote del PR #5
-// (OrquestaComun/antirrebote.h). Cuando ese PR entre a main, usar ese y borrar este.
+// El botón solo cuenta una pulsación si la lectura se queda estable el tiempo indicado.
+// Recibo la lectura y la hora en vez de leer el pin; así lo pruebo en la compu sin placa.
+// OrquestaComun ya trae Antirrebote (PR #5); el osito sigue con este filtro local.
 #pragma once
 
 #include <cstdint>
@@ -10,7 +9,7 @@ class FiltroBoton {
  public:
   explicit FiltroBoton(uint32_t estable_ms) : estable_ms_(estable_ms) {}
 
-  // Parte del estado real para que un botón ya presionado al arrancar no cuente como pulsación.
+  // Si el botón ya está presionado al arrancar, no lo cuento como pulsación.
   void iniciar(bool presionado, uint32_t ahora_ms);
   void actualizar(bool presionado, uint32_t ahora_ms);
 

@@ -14,7 +14,7 @@ struct Recibido {
   estado_animales::Fuente fuente;
 };
 
-// Osito: después de conectarse al router (cuando lo haya), para usar su mismo canal.
+// En el osito, llama a iniciar() después de conectar al Wi-Fi para usar el mismo canal.
 void iniciar();
 void actualizar();
 

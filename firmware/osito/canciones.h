@@ -1,8 +1,8 @@
 // Canciones del modo Canción. Cada parte es una lista de pasos que se repite sola;
 // el índice de `partes` es el Nodo que la controla (Osito = la base, suena siempre).
 //
-// TODO(equipo): elegir la canción final ("Estrellita" o "Los pollitos dicen", sección 1 de la
-// especificación), transcribirla aquí y agregarla a LISTA. Por ahora solo existe "prueba".
+// Falta que el equipo escoja la canción final ("Estrellita" o "Los pollitos dicen", sección 1
+// de la especificación) y la transcriba aquí. Por ahora solo está "prueba".
 #pragma once
 
 #include <protocolo.h>

@@ -29,7 +29,7 @@ void anunciarModo() {
                 director::cancion());
 }
 
-// Request/Response: el dashboard sabe que el cambio de verdad ocurrió solo con este ack.
+// El tablero sabe si el osito aceptó el cambio con este acuse.
 void atenderPedidosModo(uint32_t ahora_ms) {
   contrato_mqtt::PedidoModo pedido;
   while (nube::sacarPedidoModo(pedido)) {

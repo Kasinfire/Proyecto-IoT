@@ -8,7 +8,7 @@ void FiltroBoton::iniciar(bool presionado, uint32_t ahora_ms) {
 }
 
 void FiltroBoton::actualizar(bool presionado, uint32_t ahora_ms) {
-  // Mientras rebota, cada cambio reinicia el reloj y nunca llega a estable_ms_.
+  // Si el botón sigue rebotando, reinicio el conteo desde el último cambio.
   if (presionado != lectura_previa_) {
     lectura_previa_ = presionado;
     cambio_ms_ = ahora_ms;

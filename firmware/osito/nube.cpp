@@ -90,8 +90,8 @@ void publicarEventos(uint32_t ahora_ms) {
         !contrato_mqtt::topicoEvento(static_cast<Nodo>(nodo), topico, sizeof(topico))) {
       break;
     }
-    // TODO(equipo): cifrar `json` con AES-128-GCM y mandarlo en Base64 cuando se acuerden con
-    // Node-RED la clave en NVS y qué va como AAD. Hoy solo sale por el transporte simulado.
+    // Falta acordar con Node-RED la clave que va en NVS y qué usar como AAD. Por ahora solo
+    // publico por el transporte simulado; todavía no sale cifrado a un broker real.
     if (!transporte->publicar(topico, json, false)) {
       break;
     }
