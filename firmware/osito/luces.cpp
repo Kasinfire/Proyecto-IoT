@@ -8,6 +8,10 @@
 
 namespace luces {
 namespace {
+// Los LEDs van de 3.3 V al GPIO (con su resistencia): encienden con LOW y se apagan con HIGH.
+constexpr uint8_t LED_ENCENDIDO = LOW;
+constexpr uint8_t LED_APAGADO = HIGH;
+
 protocolo::Modo modo_actual = protocolo::Modo::Cancion;
 bool en_pulso = false;
 uint32_t inicio_pulso_ms = 0;
@@ -15,11 +19,15 @@ bool hay_alerta = false;
 bool alerta_prendida = false;
 uint32_t ultimo_parpadeo_ms = 0;
 
+void escribirLed(uint8_t pin, bool encendido) {
+  digitalWrite(pin, encendido ? LED_ENCENDIDO : LED_APAGADO);
+}
+
 void escribirModo(bool apagados) {
   const bool a = modo_actual != protocolo::Modo::Libre;
   const bool b = modo_actual != protocolo::Modo::Cancion;
-  digitalWrite(pines::LED_MODO_A, a && !apagados ? HIGH : LOW);
-  digitalWrite(pines::LED_MODO_B, b && !apagados ? HIGH : LOW);
+  escribirLed(pines::LED_MODO_A, a && !apagados);
+  escribirLed(pines::LED_MODO_B, b && !apagados);
 }
 }  // namespace
 
@@ -27,7 +35,7 @@ void iniciar() {
   pinMode(pines::LED_MODO_A, OUTPUT);
   pinMode(pines::LED_MODO_B, OUTPUT);
   pinMode(pines::LED_ALERTA, OUTPUT);
-  digitalWrite(pines::LED_ALERTA, LOW);
+  escribirLed(pines::LED_ALERTA, false);
   escribirModo(false);
 }
 
@@ -40,7 +48,7 @@ void actualizar() {
   if (hay_alerta && ahora_ms - ultimo_parpadeo_ms >= config::PARPADEO_ALERTA_MS) {
     ultimo_parpadeo_ms = ahora_ms;
     alerta_prendida = !alerta_prendida;
-    digitalWrite(pines::LED_ALERTA, alerta_prendida ? HIGH : LOW);
+    escribirLed(pines::LED_ALERTA, alerta_prendida);
   }
 }
 
@@ -62,7 +70,7 @@ void alerta(bool encendida) {
   hay_alerta = encendida;
   if (!encendida) {
     alerta_prendida = false;
-    digitalWrite(pines::LED_ALERTA, LOW);
+    escribirLed(pines::LED_ALERTA, false);
   }
 }
 }  // namespace luces
