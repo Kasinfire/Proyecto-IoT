@@ -15,6 +15,7 @@ bool radio_lista = false;
 uint32_t ultimo_latido_ms = 0;
 uint32_t ultimo_reporte_ms = 0;
 ColaCircular<Recibido, config::CAPACIDAD_EVENTOS> eventos;
+ColaCircular<estado_animales::CambioConexion, config::CAPACIDAD_CAMBIOS> cambios;
 
 const char* nombreFuente(Fuente fuente) {
   return estado_animales::NOMBRE_FUENTE[protocolo::aEntero(fuente)];
@@ -60,6 +61,7 @@ void reportarCambios(uint32_t ahora_ms) {
     Serial.printf("[%s] %s %s\n", nombreFuente(cambio.fuente),
                   protocolo::NOMBRE_NODO[protocolo::aEntero(cambio.nodo)],
                   cambio.conectado ? "se conectó" : "se desconectó (sin latido)");
+    cambios.meter(cambio);
   }
 }
 
@@ -119,5 +121,23 @@ void inyectarSimulado(const enlace::Mensaje& mensaje) {
 
 bool siguiente(Recibido& recibido) {
   return eventos.sacar(recibido);
+}
+
+bool siguienteCambio(estado_animales::CambioConexion& cambio) {
+  return cambios.sacar(cambio);
+}
+
+bool avisarModo(protocolo::Modo modo) {
+  const bool enviado = radio_lista && enlace::enviar(protocolo::PayloadModo{protocolo::aEntero(modo)});
+  Serial.printf("[RADIO] -> todos modo=%s%s\n", protocolo::NOMBRE_MODO[protocolo::aEntero(modo)],
+                enviado ? "" : " (NO enviado: radio apagada)");
+  return enviado;
+}
+
+bool pedirLuz(const protocolo::PayloadLuz& luz) {
+  const bool enviado = radio_lista && enlace::enviar(luz);
+  Serial.printf("[RADIO] -> luz %s led=%u %u ms%s\n", protocolo::NOMBRE_NODO[luz.nodo_destino],
+                luz.led, luz.duracion_ms, enviado ? "" : " (NO enviado: radio apagada)");
+  return enviado;
 }
 }  // namespace animales

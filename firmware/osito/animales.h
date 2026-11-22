@@ -25,4 +25,10 @@ void inyectarSimulado(const enlace::Mensaje& mensaje);
 
 // Gestos ya validados, en orden de llegada (sin latidos).
 bool siguiente(Recibido& recibido);
+// Conexiones y desconexiones, para el aviso sonoro y para MQTT.
+bool siguienteCambio(estado_animales::CambioConexion& cambio);
+
+// Osito -> animales, por difusión con la clave de grupo. false si la radio está apagada.
+bool avisarModo(protocolo::Modo modo);
+bool pedirLuz(const protocolo::PayloadLuz& luz);
 }  // namespace animales

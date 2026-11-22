@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "director.h"
 #include "estado_animales.h"
 #include "filtro_boton.h"
 #include "interprete.h"
@@ -195,6 +196,176 @@ void pruebasAntirrebote() {
   arranque.actualizar(true, 100);
   revisar("antirrebote: presionado al arrancar no cuenta", !arranque.sePresiono());
 }
+// Sintetizador falso: solo cuenta lo que el director le pide.
+class SintetizadorFalso : public Sintetizador {
+ public:
+  void iniciar() override {}
+  void notaOn(uint8_t canal, uint8_t nota, uint8_t) override {
+    ++on[canal];
+    ultima_on[canal] = nota;
+  }
+  void notaOff(uint8_t canal, uint8_t) override {
+    ++off[canal];
+  }
+  void expresion(uint8_t canal, uint8_t valor) override {
+    exp[canal] = valor;
+  }
+  void volumen(uint8_t) override {}
+  void limpiar() {
+    for (int i = 0; i < 17; ++i) {
+      on[i] = off[i] = 0;
+    }
+  }
+  int on[17] = {};
+  int off[17] = {};
+  uint8_t ultima_on[17] = {};
+  uint8_t exp[17] = {};
+};
+
+constexpr uint8_t C_OSITO = 1, C_RANITA = 2, C_GATITO = 3, C_POLLITO = 10;
+
+// Avanza el reloj de 1 en 1 ms. Si se indica, ese animal manda un latido SIMULADO cada 1 s.
+void correr(uint32_t& t, uint32_t hasta, int vivo = -1) {
+  for (; t < hasta; ++t) {
+    if (vivo >= 0 && t % protocolo::LATIDO_CADA_MS == 0) {
+      estado_animales::registrarMensaje(static_cast<Nodo>(vivo), Fuente::Simulacion, t);
+    }
+    director::actualizar(t);
+  }
+}
+
+interprete::Evento gesto(Nodo nodo, interprete::Clase clase, uint8_t valor, uint8_t vel = 0) {
+  const bool es_gesto = clase == interprete::Clase::Nota || valor > 0;
+  return {nodo, clase, valor, vel, es_gesto};
+}
+
+void pruebasCancion() {
+  using interprete::Clase;
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t);
+  correr(t, 4000);
+  revisar("cancion: la base del osito suena sola", s.on[C_OSITO] >= 3 && s.on[C_RANITA] == 0);
+  revisar("cancion: la base termina a expresion maxima", s.exp[C_OSITO] == 127);
+
+  // SIMULACIÓN: la ranita se conecta y la tapan una vez.
+  s.limpiar();
+  estado_animales::registrarMensaje(Nodo::Ranita, Fuente::Simulacion, t);
+  estado_animales::registrarGesto(Nodo::Ranita, t);
+  director::alEvento(gesto(Nodo::Ranita, Clase::Sombra, 60), t);
+  const uint32_t gesto_ms = t;
+  const int vivo = protocolo::aEntero(Nodo::Ranita);
+  correr(t, gesto_ms + 1900, vivo);
+  revisar("cancion: con gesto de la ranita entra su parte", s.on[C_RANITA] >= 1);
+  revisar("cancion: el gesto no toca notas sueltas", s.ultima_on[C_RANITA] == 64);
+  revisar("cancion: 1.9 s tras el gesto sigue a todo volumen", s.exp[C_RANITA] == 127);
+  correr(t, gesto_ms + 2000 + 150 + 20, vivo);
+  revisar("cancion: sigue conectada (con latido)", estado_animales::estaConectado(Nodo::Ranita, t));
+  revisar("cancion: ~2 s tras el ultimo gesto la parte sale (expresion 0)", s.exp[C_RANITA] == 0);
+  const int antes = s.on[C_RANITA];
+  correr(t, gesto_ms + 4500, vivo);
+  revisar("cancion: ya sin gesto no vuelve a sonar", s.on[C_RANITA] == antes);
+  revisar("cancion: la base sigue sonando", s.exp[C_OSITO] == 127);
+
+  revisar("cancion: \"estrellita\" no existe todavia", !director::elegirCancion("estrellita"));
+  revisar("cancion: \"prueba\" si existe", director::elegirCancion("prueba"));
+}
+
+void pruebasLibre() {
+  using interprete::Clase;
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t);
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  s.limpiar();
+  correr(t, 3000);
+  revisar("libre: sin gestos no suena nada (ni la base)", s.on[C_OSITO] == 0);
+
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 90), t);
+  revisar("libre: gatito mi -> nota 64", s.on[C_GATITO] == 1 && s.ultima_on[C_GATITO] == 64);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 0), t);
+  revisar("libre: al soltar se apaga", s.off[C_GATITO] == 1);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 3, 90), t);
+  revisar("libre: tecla fa toca sol (67), pentatonica", s.ultima_on[C_GATITO] == 67);
+
+  director::alEvento(gesto(Nodo::Ranita, Clase::Sombra, 100), t);
+  revisar("libre: ranita tapada -> nota mas aguda (88)", s.ultima_on[C_RANITA] == 88);
+  director::alEvento(gesto(Nodo::Ranita, Clase::Sombra, 0), t);
+  revisar("libre: ranita destapada -> se apaga", s.off[C_RANITA] == 1);
+
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 70), t);
+  revisar("libre: pollito agitado -> golpe en canal 10",
+          s.on[C_POLLITO] == 1 && s.ultima_on[C_POLLITO] == 70);
+  correr(t, t + 150);
+  revisar("libre: el golpe se apaga solo", s.off[C_POLLITO] == 1);
+
+  const uint8_t pentatonica[] = {60, 62, 64, 67, 69, 72, 74, 76, 79, 81, 84, 86, 88};
+  bool todas_en_escala = true;
+  for (uint8_t nivel = 1; nivel <= 100; ++nivel) {
+    director::alEvento(gesto(Nodo::Ranita, Clase::Sombra, nivel), t);
+    bool esta = false;
+    for (uint8_t n : pentatonica) {
+      esta = esta || s.ultima_on[C_RANITA] == n;
+    }
+    todas_en_escala = todas_en_escala && esta;
+  }
+  revisar("libre: los 100 niveles de sombra caen en la pentatonica", todas_en_escala);
+}
+
+void pruebasSimon() {
+  using interprete::Clase;
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 12345, t);
+  director::cambiarModo(protocolo::Modo::Simon, t);
+  protocolo::PayloadLuz luz;
+  simon::Resultado resultado;
+
+  correr(t, 5000);
+  revisar("simon: sin animales conectados no pide nada", !director::sacarLuz(luz));
+
+  // SIMULACIÓN: solo el gatito está conectado.
+  const int vivo = protocolo::aEntero(Nodo::Gatito);
+  correr(t, 5100, vivo);
+  bool pidio = director::sacarLuz(luz);
+  revisar("simon: pide una tecla del gatito",
+          pidio && luz.nodo_destino == protocolo::aEntero(Nodo::Gatito) &&
+              luz.led < protocolo::NUM_NOTAS);
+
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, luz.led, 90), t);
+  revisar("simon: tecla correcta -> acierto",
+          director::sacarResultado(resultado) && resultado == simon::Resultado::Acierto);
+
+  correr(t, t + 1600, vivo);
+  pidio = director::sacarLuz(luz);
+  const uint8_t otra = (luz.led + 1) % protocolo::NUM_NOTAS;
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, otra, 90), t);
+  revisar("simon: tecla equivocada -> error",
+          pidio && director::sacarResultado(resultado) && resultado == simon::Resultado::Error);
+
+  correr(t, t + 1600, vivo);
+  pidio = director::sacarLuz(luz);
+  correr(t, t + 5100, vivo);
+  revisar("simon: sin respuesta en 5 s -> tiempo agotado",
+          pidio && director::sacarResultado(resultado) &&
+              resultado == simon::Resultado::TiempoAgotado);
+  revisar("simon: cuenta 1 acierto y 2 errores", simon::aciertos() == 1 && simon::errores() == 2);
+}
+
+void pruebasModos() {
+  SintetizadorFalso s;
+  director::iniciar(s, 1, 0);
+  director::siguienteModo(0);
+  const bool libre = director::modo() == protocolo::Modo::Libre;
+  director::siguienteModo(0);
+  const bool simon = director::modo() == protocolo::Modo::Simon;
+  director::siguienteModo(0);
+  revisar("boton: cancion -> libre -> simon -> cancion",
+          libre && simon && director::modo() == protocolo::Modo::Cancion);
+}
 }  // namespace
 
 int main() {
@@ -205,6 +376,10 @@ int main() {
   pruebasCambios();
   pruebasAlerta();
   pruebasAntirrebote();
+  pruebasCancion();
+  pruebasLibre();
+  pruebasSimon();
+  pruebasModos();
   printf("[SIMULACIÓN] %d de %d pruebas pasaron\n", pruebas - fallos, pruebas);
   return fallos == 0 ? 0 : 1;
 }
