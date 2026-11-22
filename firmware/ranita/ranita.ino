@@ -1,9 +1,9 @@
 // Ranita: acompañamiento (violín). La sombra de la mano sobre la LDR controla
 // su parte de la canción, como un theremín, y se la avisa al osito.
+#include <enlace.h>
 #include <protocolo.h>
 
 #include "config.h"
-#include "enlace.h"
 #include "mejillas.h"
 #include "sensor_sombra.h"
 
@@ -11,7 +11,7 @@ void setup() {
   Serial.begin(config::BAUDIOS);
   sensor_sombra::iniciar();
   mejillas::iniciar();
-  enlace::iniciar();
+  enlace::iniciar(protocolo::Nodo::Ranita);
 }
 
 void loop() {
