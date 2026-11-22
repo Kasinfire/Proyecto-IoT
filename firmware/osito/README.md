@@ -6,16 +6,22 @@ La idea completa está en [`orquesta-proyecto.md`](../../orquesta-proyecto.md).
 
 ## Qué he podido probar
 
-**Compilación (22/11/2026):** el firmware compiló y llegó a `esptool.py v5.3.1`. La carga a la
-placa sigue en curso; falta confirmar que termine y que el osito arranque con este firmware. El
-puerto USB aparece, pero eso por sí solo no confirma que la carga haya quedado bien.
+**Carga confirmada (22/11/2026):** ya quedó cargado el firmware corregido en el osito.
 
-**Simulación:** corrí `./pruebas/correr.sh` en la compu y pasaron **81 de 81 pruebas**. Son pruebas
+**Modos probados en físico:** en Canción parpadea el azul del GPIO18; en Libre queda encendido
+solo el verde del GPIO19; en Simón quedan encendidos el azul y el verde, y el rojo del GPIO21 está
+apagado. Por separado ya se habían probado el potenciómetro, el botón, los LEDs, el PAM8403 y la
+bocina.
+
+**Simulación:** corrí `./pruebas/correr.sh` en la compu y pasaron **82 de 82 pruebas**. Son pruebas
 de lógica, con stubs y sin placa: no comprueban ESP-NOW, el cifrado ni el hardware real.
 
-**Comprobado en físico:** por separado ya se habían probado el potenciómetro, el botón, los LEDs,
-el PAM8403 y la bocina. Todavía falta validar el conjunto con este firmware, incluida la radio y el
-audio; esas pruebas no se dan por hechas mientras la carga siga en curso.
+**Compilación local:** compila para ESP32 Dev Module (`esp32:esp32:esp32`). La compilación no
+carga la placa ni valida la radio o el audio integrado.
+
+**Pendiente en físico:** falta comprobar que el rojo del GPIO21 prenda ante una alerta. También
+siguen pendientes las pruebas de radio y de audio integrado; la carga confirmada no significa que
+esas partes ya estén validadas.
 
 ## Qué hace cada módulo
 
@@ -28,7 +34,7 @@ audio; esas pruebas no se dan por hechas mientras la carga siga en curso.
 | `estado_animales`                  | Lleva conexión (latido < 5 s), actividad (gesto < 2 s) y alertas        | no                   |
 | `simulacion`                       | Acepta comandos `sim ...` por el monitor serie                          | sí                   |
 | `entradas`                         | Lee el potenciómetro (GPIO34) y el botón de modo (GPIO27)               | sí                   |
-| `filtro_boton`                     | Quita rebotes sin usar `delay()`; podría duplicar el PR #5              | no                   |
+| `filtro_boton`                     | Filtro local sin `delay()`; OrquestaComun ya trae `Antirrebote` (PR #5) | no                   |
 | `luces`                            | LEDs 18/19 para modo y 21 para animal desconectado                      | sí                   |
 | `director`, `simon`, `canciones.h` | Modos Canción, Libre y Simón Dice                                       | no                   |
 | `sintetizador.h`                   | Interfaz de audio; `SintetizadorRegistro` solo imprime, no suena        | —                    |
@@ -45,7 +51,7 @@ cableado:
 | Potenciómetro | GPIO34 (ADC1)                            |
 | Botón de modo | GPIO27 a GND, con `INPUT_PULLUP`         |
 | LEDs de modo  | GPIO18 y GPIO19                          |
-| LED de alerta | GPIO21; avisa si se desconecta un animal |
+| LED de alerta | GPIO21; falta probar que prenda ante una alerta |
 
 Uso ADC1 para el potenciómetro porque ADC2 no funciona con Wi-Fi/ESP-NOW activos.
 
@@ -96,6 +102,7 @@ y los animales lo cuentan para `enlace::estaConectado(Nodo::Osito)`.
   Falta guardarlo en NVS o agregar `arranque` al contrato.
 - **Persistencia de la cola:** los 64 eventos viven en RAM y se pierden al reiniciar; falta pasarlos
   a LittleFS.
-- **Animales y botón:** la ranita todavía no lee `PayloadModo` ni `PayloadLuz`; el gatito (PR #6)
-  usa enlace simulado y el pollito aún no tiene firmware. Cuando entre el PR #5, cambiaré
-  `filtro_boton` por `Antirrebote` de OrquestaComun.
+- **Animales y botón:** la ranita todavía no lee `PayloadModo` ni `PayloadLuz`; el gatito ya está
+  integrado en `main` (PR #6), pero su enlace sigue simulado; el pollito aún no tiene firmware.
+  El osito conserva su filtro local; queda pendiente decidir si migrarlo al `Antirrebote` compartido
+  de OrquestaComun, que llegó con el PR #5.
