@@ -8,6 +8,6 @@ COMUN="$OSITO/../libraries/OrquestaComun/src"
 SALIDA="${TMPDIR:-/tmp}/prueba_osito"
 c++ -std=c++17 -Wall -Wextra -I"$AQUI/stubs" -I"$COMUN" -I"$OSITO" \
   "$AQUI/prueba_logica.cpp" \
-  "$OSITO/estado_animales.cpp" "$OSITO/interprete.cpp" \
+  "$OSITO/estado_animales.cpp" "$OSITO/interprete.cpp" "$OSITO/filtro_boton.cpp" \
   -o "$SALIDA"
 "$SALIDA"

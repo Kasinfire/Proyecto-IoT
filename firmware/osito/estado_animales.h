@@ -31,6 +31,10 @@ void sostenerTecla(protocolo::Nodo nodo, uint8_t tecla, bool presionada);
 bool estaConectado(protocolo::Nodo nodo, Fuente fuente, uint32_t ahora_ms);
 bool estaConectado(protocolo::Nodo nodo, uint32_t ahora_ms);  // por radio o simulado
 bool estaActivo(protocolo::Nodo nodo, uint32_t ahora_ms);
+// Ya había mandado algo y dejó de hacerlo: es la alerta de "animalito desconectado".
+// Un animal que nunca apareció no cuenta, si no la alerta estaría siempre prendida.
+bool seDesconecto(protocolo::Nodo nodo, uint32_t ahora_ms);
+bool algunoSeDesconecto(uint32_t ahora_ms);
 
 // Devuelve uno a uno los cambios de conexión desde la última llamada.
 bool sacarCambio(uint32_t ahora_ms, CambioConexion& cambio);

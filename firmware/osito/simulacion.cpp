@@ -9,6 +9,7 @@
 
 #include "animales.h"
 #include "config.h"
+#include "entradas.h"
 
 namespace simulacion {
 namespace {
@@ -27,6 +28,7 @@ void ayuda() {
   Serial.println("  sim gatito nota <do|re|mi|fa|sol|la|si> <0-127>   (0 = soltó)");
   Serial.println("  sim pollito agitar <0-100>");
   Serial.println("  sim vivo <ranita|gatito|pollito|todos> <on|off>   (latido cada 1 s)");
+  Serial.println("  sim boton                                          (botón de modo)");
 }
 
 bool buscar(const char* texto, const char* const* nombres, size_t cuantos, uint8_t& indice) {
@@ -137,6 +139,9 @@ void ejecutar() {
   }
   if (palabras[1] != nullptr && strcmp(palabras[1], "vivo") == 0) {
     comandoVivo(palabras[2], palabras[3]);
+  } else if (palabras[1] != nullptr && strcmp(palabras[1], "boton") == 0) {
+    Serial.println("[SIMULACIÓN] botón de modo presionado");
+    entradas::simularPresionModo();
   } else {
     comandoAnimal(palabras[1], palabras[2], palabras[3], palabras[4]);
   }

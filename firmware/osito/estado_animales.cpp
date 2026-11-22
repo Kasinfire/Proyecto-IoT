@@ -84,6 +84,24 @@ bool estaActivo(Nodo nodo, uint32_t ahora_ms) {
          (animal.hubo_gesto && ahora_ms - animal.ultimo_gesto_ms < config::ACTIVO_TRAS_GESTO_MS);
 }
 
+bool seDesconecto(Nodo nodo, uint32_t ahora_ms) {
+  if (!esAnimal(nodo)) {
+    return false;
+  }
+  const Animal& animal = de(nodo);
+  const bool alguna_vez = animal.hubo_mensaje[0] || animal.hubo_mensaje[1];
+  return alguna_vez && !estaConectado(nodo, ahora_ms);
+}
+
+bool algunoSeDesconecto(uint32_t ahora_ms) {
+  for (size_t i = 0; i < protocolo::NUM_NODOS; ++i) {
+    if (seDesconecto(static_cast<Nodo>(i), ahora_ms)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool sacarCambio(uint32_t ahora_ms, CambioConexion& cambio) {
   for (size_t i = 0; i < protocolo::NUM_NODOS; ++i) {
     const Nodo nodo = static_cast<Nodo>(i);

@@ -4,6 +4,7 @@
 #include <cstring>
 
 #include "estado_animales.h"
+#include "filtro_boton.h"
 #include "interprete.h"
 
 namespace {
@@ -141,6 +142,59 @@ void pruebasCambios() {
   hubo = sacarCambio(6000, cambio);
   revisar("cambio: ranita se desconecto tras 5 s", hubo && !cambio.conectado);
 }
+void pruebasAlerta() {
+  using namespace estado_animales;
+  reiniciar();
+  revisar("alerta: animal que nunca aparecio no la dispara", !algunoSeDesconecto(10000));
+  registrarMensaje(Nodo::Ranita, Fuente::Radio, 1000);
+  revisar("alerta: ranita conectada -> sin alerta", !algunoSeDesconecto(2000));
+  revisar("alerta: ranita sin latido 5 s -> alerta", algunoSeDesconecto(6000));
+  registrarMensaje(Nodo::Ranita, Fuente::Radio, 6500);
+  revisar("alerta: vuelve el latido -> se apaga", !algunoSeDesconecto(6600));
+}
+
+void pruebasAntirrebote() {
+  FiltroBoton boton(30);
+  boton.iniciar(false, 0);
+  // Un contacto real: rebota 5 ms en cada borde.
+  uint32_t t = 100;
+  int pulsaciones = 0;
+  for (int i = 0; i < 20; ++i) {
+    for (int r = 0; r < 5; ++r, ++t) {
+      boton.actualizar(r % 2 == 0, t);
+      pulsaciones += boton.sePresiono();
+    }
+    for (int k = 0; k < 60; ++k, ++t) {
+      boton.actualizar(true, t);
+      pulsaciones += boton.sePresiono();
+    }
+    for (int r = 0; r < 5; ++r, ++t) {
+      boton.actualizar(r % 2 == 1, t);
+      pulsaciones += boton.sePresiono();
+    }
+    for (int k = 0; k < 60; ++k, ++t) {
+      boton.actualizar(false, t);
+      pulsaciones += boton.sePresiono();
+    }
+  }
+  char nombre[64];
+  snprintf(nombre, sizeof(nombre), "antirrebote: 20 pulsaciones con rebote -> %d", pulsaciones);
+  revisar(nombre, pulsaciones == 20);
+
+  FiltroBoton ruido(30);
+  ruido.iniciar(false, 0);
+  int falsas = 0;
+  for (uint32_t k = 0; k < 500; ++k) {
+    ruido.actualizar(k % 20 < 10, k);  // pulsos de 10 ms, mas cortos que 30 ms
+    falsas += ruido.sePresiono();
+  }
+  revisar("antirrebote: picos de 10 ms no cuentan", falsas == 0);
+
+  FiltroBoton arranque(30);
+  arranque.iniciar(true, 0);
+  arranque.actualizar(true, 100);
+  revisar("antirrebote: presionado al arrancar no cuenta", !arranque.sePresiono());
+}
 }  // namespace
 
 int main() {
@@ -149,6 +203,8 @@ int main() {
   pruebasConexion();
   pruebasActividad();
   pruebasCambios();
+  pruebasAlerta();
+  pruebasAntirrebote();
   printf("[SIMULACIÓN] %d de %d pruebas pasaron\n", pruebas - fallos, pruebas);
   return fallos == 0 ? 0 : 1;
 }
