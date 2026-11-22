@@ -358,6 +358,16 @@ void pruebasSimon() {
   revisar("simon: cuenta 1 acierto y 2 errores", simon::aciertos() == 1 && simon::errores() == 2);
 }
 
+void pruebasArranque() {
+  SintetizadorFalso s;
+  director::iniciar(s, 1, 0);
+  int apagados = 0;
+  for (int c = 0; c < 17; ++c) {
+    apagados += s.off[c];
+  }
+  revisar("arranque: no apaga notas que nunca sonaron", apagados == 0);
+}
+
 void pruebasModos() {
   SintetizadorFalso s;
   director::iniciar(s, 1, 0);
@@ -450,6 +460,7 @@ void pruebasColaEventos() {
 
 int main() {
   printf("[SIMULACIÓN] Pruebas de logica del osito en la compu (sin placa)\n");
+  pruebasArranque();  // primero: necesita el director recién encendido
   pruebasInterprete();
   pruebasConexion();
   pruebasActividad();

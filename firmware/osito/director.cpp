@@ -237,6 +237,14 @@ void iniciar(Sintetizador& sintetizador, uint32_t semilla, uint32_t ahora_ms) {
   hay_luz = false;
   hay_resultado = false;
   hubo_pulso = false;
+  // Al arrancar nada está sonando: sin esto apagarTodo() manda OFF de la nota 0 en cada canal.
+  for (Parte& parte : partes) {
+    parte = {0, 0, SIN_NOTA, 0, 0};
+  }
+  for (uint8_t& nota : teclas_sonando) {
+    nota = SIN_NOTA;
+  }
+  nota_ranita = SIN_NOTA;
   simon::iniciar(semilla, ahora_ms);
   prepararModo(ahora_ms);
 }
