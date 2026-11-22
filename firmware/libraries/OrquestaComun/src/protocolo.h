@@ -24,7 +24,7 @@
 
 namespace protocolo {
 
-constexpr uint8_t VERSION = 1;
+constexpr uint8_t VERSION = 2;
 
 // Valor numérico de cualquier enum class, para indexar arreglos o meterlo en un struct.
 template <typename E>
@@ -60,10 +60,18 @@ inline constexpr const char* NOMBRE_NOTA[] = {"do", "re", "mi", "fa", "sol", "la
 constexpr size_t NUM_NOTAS = std::size(NOMBRE_NOTA);
 
 enum class Modo : uint8_t { Cancion, Libre, Simon };
+// Mismo orden que Modo y mismo texto que el campo "modo" de orquesta/control/modo.
+inline constexpr const char* NOMBRE_MODO[] = {"cancion", "libre", "simon"};
+constexpr size_t NUM_MODOS = std::size(NOMBRE_MODO);
 
 constexpr uint8_t VELOCIDAD_MIDI_MIN = 1;
 constexpr uint8_t VELOCIDAD_MIDI_MAX = 127;
+// En PayloadNota::velocidad: la tecla se soltó (como un note on con velocidad 0 en MIDI).
+constexpr uint8_t VELOCIDAD_SOLTO = 0;
 constexpr uint8_t NIVEL_SOMBRA_MAX = 100;
+constexpr uint8_t INTENSIDAD_AGITAR_MAX = 100;
+// En PayloadLuz::led: prende todos los LEDs del animal.
+constexpr uint8_t LED_TODOS = 0xFF;
 
 #pragma pack(push, 1)
 
@@ -77,7 +85,7 @@ struct Cabecera {
 
 struct PayloadNota {
   uint8_t nota;
-  uint8_t velocidad;
+  uint8_t velocidad;  // VELOCIDAD_MIDI_MIN..MAX al presionar, VELOCIDAD_SOLTO al soltar
 };
 
 struct PayloadSombra {
@@ -87,16 +95,18 @@ struct PayloadSombra {
 // El SW-520D solo da 0/1: el pollito calcula la intensidad a partir de
 // cuántas veces cambia el sensor en una ventana de tiempo.
 struct PayloadAgitar {
-  uint8_t intensidad;
+  uint8_t intensidad;  // 0..INTENSIDAD_AGITAR_MAX
 };
 
 struct PayloadModo {
   uint8_t modo;
 };
 
-// Simón Dice.
+// Simón Dice. Viaja con la clave de grupo y lo reciben todos: cada animal
+// ignora los que no traen su nodo_destino.
 struct PayloadLuz {
-  uint8_t led;
+  uint8_t nodo_destino;  // Nodo
+  uint8_t led;           // gatito: aEntero(Nota); ranita: 0 izq, 1 der; pollito: 0; o LED_TODOS
   uint16_t duracion_ms;
 };
 
@@ -136,4 +146,4 @@ struct TipoDe<PayloadLuz> : RegistroPayload<PayloadLuz, TipoMensaje::Luz> {};
 constexpr uint32_t LATIDO_CADA_MS = 1000;
 constexpr uint32_t DESCONECTADO_TRAS_MS = 5000;
 
-}
+}  // namespace protocolo
