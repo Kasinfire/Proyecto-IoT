@@ -34,32 +34,6 @@ class ColaCircular {
 
 ---
 
-## 2. `PromedioMovil<N>` — `src/promedio_movil.h`
-
-**Para qué:** suavizar lecturas ruidosas del ADC para que la nota o el volumen no "tiemblen".
-
-**Usan:** ranita (LDR), osito (potenciómetro de volumen).
-
-**Interfaz esperada:**
-
-```cpp
-template <size_t N>
-class PromedioMovil {
- public:
-  uint16_t agregar(uint16_t lectura);  // agrega y devuelve el promedio actual
-  uint16_t valor() const;
-  void reiniciar();
-};
-```
-
-**Cuidados:**
-- Llevar la suma acumulada en lugar de recorrer el arreglo en cada lectura.
-- Mientras no haya `N` lecturas, promediar solo las que hay (no dividir entre `N`).
-
-**Listo cuando:** con la LDR destapada la salida varía mucho menos que `analogRead` directo (poner la comparación en el Serial Plotter como evidencia para el reporte).
-
----
-
 ## 3. `Antirrebote` — `src/antirrebote.h`
 
 **Para qué:** que un botón o sensor digital reporte un solo cambio aunque el contacto rebote varias veces.
