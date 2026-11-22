@@ -4,7 +4,9 @@
 // Escribe "ayuda" para ver los comandos.
 #pragma once
 
+#include "transporte_simulado.h"
+
 namespace simulacion {
-void iniciar();
+void iniciar(TransporteSimulado& broker);
 void actualizar();
 }  // namespace simulacion

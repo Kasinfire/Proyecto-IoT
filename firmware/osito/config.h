@@ -52,6 +52,20 @@ constexpr uint16_t SIMON_LUZ_MS = 1500;
 constexpr uint32_t SIMON_ESPERA_MS = 5000;
 constexpr uint32_t SIMON_PAUSA_MS = 1500;
 
+// MQTT
+// RAM: 64 x 128 B = 8 KB. Sin Wi-Fi, a ~2 eventos/s alcanza para ~30 s; lo demás se descarta
+// (el más viejo primero) hasta pasar la cola a LittleFS.
+constexpr size_t CAPACIDAD_COLA_MQTT = 64;
+constexpr size_t EVENTO_JSON_MAX = 128;
+constexpr size_t TOPICO_MAX = 40;
+constexpr size_t PUBLICAR_POR_VUELTA = 4;
+constexpr uint32_t REPUBLICAR_SIN_ACK_MS = 10000;
+// La ranita reporta hasta 20 veces por segundo: al broker solo va cada medio segundo
+// (y siempre cuando empieza o deja de haber sombra).
+constexpr uint32_t SOMBRA_EVENTO_CADA_MS = 500;
+constexpr uint32_t HORA_VALIDA_DESDE = 1700000000;  // antes de esto NTP no ha respondido
+constexpr size_t PEDIDOS_MODO_MAX = 4;
+
 // Simulación por monitor serie
 constexpr size_t LINEA_SIM_MAX = 96;
 constexpr size_t PALABRAS_SIM_MAX = 8;

@@ -3,6 +3,9 @@
 #include <cstdio>
 #include <cstring>
 
+#include "cola_eventos.h"
+#include "config.h"
+#include "contrato_mqtt.h"
 #include "director.h"
 #include "estado_animales.h"
 #include "filtro_boton.h"
@@ -366,6 +369,83 @@ void pruebasModos() {
   revisar("boton: cancion -> libre -> simon -> cancion",
           libre && simon && director::modo() == protocolo::Modo::Cancion);
 }
+void pruebasContratoMqtt() {
+  using interprete::Clase;
+  char texto[128];
+  contrato_mqtt::topicoEvento(Nodo::Gatito, texto, sizeof(texto));
+  revisar("mqtt: topico orquesta/gatito/evento", strcmp(texto, "orquesta/gatito/evento") == 0);
+  contrato_mqtt::topicoEstado(Nodo::Pollito, texto, sizeof(texto));
+  revisar("mqtt: topico orquesta/pollito/estado", strcmp(texto, "orquesta/pollito/estado") == 0);
+
+  contrato_mqtt::armarEvento(1532, 1762900000, gesto(Nodo::Gatito, Clase::Nota, 2, 90), texto,
+                             sizeof(texto));
+  revisar("mqtt: evento igual al ejemplo de la especificacion",
+          strcmp(texto,
+                 "{\"seq\":1532,\"t\":1762900000,\"nodo\":\"gatito\",\"tipo\":\"nota\","
+                 "\"nota\":\"mi\",\"vel\":90}") == 0);
+  char corto[20];
+  revisar("mqtt: si no cabe el JSON, no se arma a medias",
+          !contrato_mqtt::armarEvento(1, 0, gesto(Nodo::Gatito, Clase::Nota, 2, 90), corto,
+                                      sizeof(corto)));
+
+  contrato_mqtt::PedidoModo pedido;
+  bool leyo = contrato_mqtt::leerPedidoModo(
+      "{\"id\": 7, \"modo\": \"simon\", \"cancion\": \"estrellita\"}", pedido);
+  revisar("mqtt: lee pedido de modo con cancion",
+          leyo && pedido.id == 7 && pedido.modo_valido && pedido.modo == protocolo::Modo::Simon &&
+              pedido.trae_cancion && strcmp(pedido.cancion, "estrellita") == 0);
+  leyo = contrato_mqtt::leerPedidoModo("{\"id\":8,\"modo\":\"karaoke\"}", pedido);
+  revisar("mqtt: modo desconocido -> modo_valido=false", leyo && !pedido.modo_valido);
+  revisar("mqtt: pedido sin id -> se ignora",
+          !contrato_mqtt::leerPedidoModo("{\"modo\":\"libre\"}", pedido));
+
+  contrato_mqtt::armarAckModo(7, true, protocolo::Modo::Cancion, texto, sizeof(texto));
+  revisar("mqtt: ack {\"id\":7,\"ok\":true,\"modo\":\"cancion\"}",
+          strcmp(texto, "{\"id\":7,\"ok\":true,\"modo\":\"cancion\"}") == 0);
+  uint32_t hasta = 0;
+  revisar("mqtt: lee sync ack hasta_seq",
+          contrato_mqtt::leerSyncAck("{\"hasta_seq\":42}", hasta) && hasta == 42);
+  revisar("mqtt: sync ack negativo -> invalido",
+          !contrato_mqtt::leerSyncAck("{\"hasta_seq\":-1}", hasta));
+}
+
+void pruebasColaEventos() {
+  cola_eventos::reiniciar();
+  for (int i = 0; i < 5; ++i) {
+    cola_eventos::agregar(cola_eventos::reservarSeq(), 2, "{}");
+  }
+  revisar("cola: 5 eventos pendientes", cola_eventos::pendientes() == 5);
+  revisar("cola: un acuse antes de publicar no borra nada",
+          cola_eventos::confirmarHasta(5) == 0 && cola_eventos::pendientes() == 5);
+
+  uint32_t seq = 0;
+  uint8_t nodo = 0;
+  const char* json = nullptr;
+  for (int i = 0; i < 3 && cola_eventos::siguientePorPublicar(seq, nodo, json); ++i) {
+    cola_eventos::marcarPublicado(seq);  // se publican 1, 2 y 3
+  }
+  revisar("cola: publicar no borra (falta el acuse)", cola_eventos::pendientes() == 5);
+  revisar("cola: acuse hasta 2 borra 1 y 2", cola_eventos::confirmarHasta(2) == 2 &&
+                                                 cola_eventos::pendientes() == 3);
+  revisar("cola: acuse hasta 5 solo borra lo publicado (el 3)",
+          cola_eventos::confirmarHasta(5) == 1 && cola_eventos::pendientes() == 2);
+  revisar("cola: sigue el 4, en orden",
+          cola_eventos::siguientePorPublicar(seq, nodo, json) && seq == 4 && nodo == 2);
+
+  cola_eventos::marcarPublicado(4);
+  cola_eventos::republicarTodo();
+  revisar("cola: al reconectar se republica desde el mas viejo",
+          cola_eventos::siguientePorPublicar(seq, nodo, json) && seq == 4);
+
+  cola_eventos::reiniciar();
+  for (size_t i = 0; i < config::CAPACIDAD_COLA_MQTT + 3; ++i) {
+    cola_eventos::agregar(cola_eventos::reservarSeq(), 1, "{}");
+  }
+  revisar("cola: llena -> descarta los 3 mas viejos",
+          cola_eventos::descartados() == 3 &&
+              cola_eventos::pendientes() == config::CAPACIDAD_COLA_MQTT &&
+              cola_eventos::siguientePorPublicar(seq, nodo, json) && seq == 4);
+}
 }  // namespace
 
 int main() {
@@ -380,6 +460,8 @@ int main() {
   pruebasLibre();
   pruebasSimon();
   pruebasModos();
+  pruebasContratoMqtt();
+  pruebasColaEventos();
   printf("[SIMULACIÓN] %d de %d pruebas pasaron\n", pruebas - fallos, pruebas);
   return fallos == 0 ? 0 : 1;
 }

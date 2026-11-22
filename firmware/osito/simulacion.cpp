@@ -9,12 +9,14 @@
 
 #include "animales.h"
 #include "config.h"
+#include "contrato_mqtt.h"
 #include "entradas.h"
 
 namespace simulacion {
 namespace {
 using protocolo::Nodo;
 
+TransporteSimulado* broker = nullptr;
 char linea[config::LINEA_SIM_MAX];
 size_t largo = 0;
 // Animales con latido simulado automático ("sim vivo").
@@ -29,6 +31,9 @@ void ayuda() {
   Serial.println("  sim pollito agitar <0-100>");
   Serial.println("  sim vivo <ranita|gatito|pollito|todos> <on|off>   (latido cada 1 s)");
   Serial.println("  sim boton                                          (botón de modo)");
+  Serial.println("  sim mqtt <on|off>                                  (broker simulado)");
+  Serial.println("  sim mqtt modo {\"id\":1,\"modo\":\"libre\"}            (pedido de Node-RED)");
+  Serial.println("  sim mqtt ack <hasta_seq>                           (acuse de Node-RED)");
 }
 
 bool buscar(const char* texto, const char* const* nombres, size_t cuantos, uint8_t& indice) {
@@ -123,7 +128,33 @@ void comandoAnimal(const char* animal, const char* que, const char* arg1, const 
   }
 }
 
+// La línea completa, antes de partirla: el JSON del pedido de modo trae espacios.
+bool comandoMqtt(const char* texto) {
+  constexpr char PREFIJO[] = "sim mqtt ";
+  constexpr char MODO[] = "modo ";
+  constexpr char ACK[] = "ack ";
+  if (strncmp(texto, PREFIJO, strlen(PREFIJO)) != 0) {
+    return false;
+  }
+  const char* resto = texto + strlen(PREFIJO);
+  if (strcmp(resto, "on") == 0 || strcmp(resto, "off") == 0) {
+    broker->conectar(strcmp(resto, "on") == 0);
+  } else if (strncmp(resto, MODO, strlen(MODO)) == 0) {
+    broker->recibir(contrato_mqtt::TOPICO_MODO, resto + strlen(MODO));
+  } else if (strncmp(resto, ACK, strlen(ACK)) == 0) {
+    char json[config::EVENTO_JSON_MAX];
+    snprintf(json, sizeof(json), "{\"hasta_seq\":%s}", resto + strlen(ACK));
+    broker->recibir(contrato_mqtt::TOPICO_SYNC_ACK, json);
+  } else {
+    ayuda();
+  }
+  return true;
+}
+
 void ejecutar() {
+  if (comandoMqtt(linea)) {
+    return;
+  }
   char* palabras[config::PALABRAS_SIM_MAX] = {};
   size_t cuantas = 0;
   for (char* p = strtok(linea, " "); p != nullptr && cuantas < config::PALABRAS_SIM_MAX;
@@ -148,7 +179,8 @@ void ejecutar() {
 }
 }  // namespace
 
-void iniciar() {
+void iniciar(TransporteSimulado& broker_simulado) {
+  broker = &broker_simulado;
   Serial.println("[SIMULACIÓN] Escribe \"ayuda\" para inyectar mensajes de prueba");
 }
 
