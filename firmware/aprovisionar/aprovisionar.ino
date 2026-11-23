@@ -12,7 +12,7 @@
 //   ver                           qué hay guardado (sin mostrar las claves)
 //   borrar                        borra todo
 #include <Preferences.h>
-#include <WiFi.h>
+#include <esp_mac.h>
 
 namespace {
 constexpr uint32_t BAUDIOS = 115200;
@@ -130,10 +130,14 @@ void procesar(char* texto) {
 
 void setup() {
   Serial.begin(BAUDIOS);
-  WiFi.mode(WIFI_STA);  // para que la MAC sea la que usa ESP-NOW
   nvs.begin(ESPACIO_NVS, false);
-  Serial.printf("\nAprovisionamiento del enlace. MAC de esta placa: %s\n",
-                WiFi.macAddress().c_str());
+  // Se lee de los eFuse: WiFi.macAddress() da ceros si el Wi-Fi todavía no termina de arrancar.
+  // Es la MAC de estación, la misma que usa ESP-NOW.
+  uint8_t mac[MAC_BYTES];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  Serial.printf(
+      "\nAprovisionamiento del enlace. MAC de esta placa: %02X:%02X:%02X:%02X:%02X:%02X\n", mac[0],
+      mac[1], mac[2], mac[3], mac[4], mac[5]);
   ver();
 }
 
