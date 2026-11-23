@@ -35,7 +35,10 @@ void cerrarVentana(uint32_t ahora_ms) {
   const uint8_t intensidad = static_cast<uint8_t>(
     (cambios_limitados * protocolo::INTENSIDAD_AGITAR_MAX) / config::CAMBIOS_PARA_INTENSIDAD_MAX);
 
-  Serial.printf("[pollito] Cambios: %u | Intensidad: %u\n", cambios, intensidad);
+  // Solo si hubo movimiento: cada VENTANA_AGITACION_MS llenaría el monitor de ceros.
+  if (cambios > 0) {
+    Serial.printf("[pollito] Cambios: %u | Intensidad: %u\n", cambios, intensidad);
+  }
 
   if (intensidad < config::UMBRAL_GESTO) {
     ventanas_fuertes = 0;
