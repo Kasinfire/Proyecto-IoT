@@ -15,7 +15,7 @@ Node-RED las sirve y les manda los datos. El diseño y su justificación están 
 | Carpeta | Contenido |
 |---|---|
 | `css/` | `base.css` (colores, tipografía, espacios), `componentes.css` (botones, encabezado, avisos, ventanas), `pantallas.css` (acomodo de cada pantalla) y `proyector.css` |
-| `js/` | `conexion.js` (WebSocket con Node-RED, se reconecta solo), `api.js` (rutas `/api/…`), `caritas.js` (caritas pixeladas y datos de cada animal), `comun.js` (ayudas y encabezado), un archivo por pantalla y `ensayo.js` (simulador) |
+| `js/` | `conexion.js` (WebSocket con Node-RED, se reconecta solo), `api.js` (rutas `/api/…`), `caritas.js` (caritas pixeladas y datos de cada animal), `comun.js` (ayudas, encabezado y pie), `selector.js` (desplegable con el estilo de la interfaz), un archivo por pantalla y `ensayo.js` (simulador) |
 | `fuentes/` | Plus Jakarta Sans y Press Start 2P con su licencia (OFL), guardadas aquí porque el consultorio puede no tener internet |
 
 ## Probarlo sin Node-RED (modo ensayo)
@@ -27,7 +27,7 @@ python3 -m http.server 8000
 ```
 
 y abrir `http://localhost:8000/en-vivo.html?ensayo`. El pollito "se desconecta" a los 6 s para ver la
-alerta, y en Conexión aparece **Simular caída** para ensayar la prueba de resiliencia. Ese botón solo
+alerta y vuelve a los 15 s, y en Conexión aparece **Simular caída** para ensayar la prueba de resiliencia. Ese botón solo
 existe en ensayo: en la demo real se apaga el router.
 
 Los módulos de JavaScript no cargan si se abre el archivo con doble clic (`file://`); hace falta un servidor.
