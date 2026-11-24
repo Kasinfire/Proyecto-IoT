@@ -62,16 +62,12 @@
   padding: 12px 14px;
   border-radius: var(--radio);
   background: #ffffff;
-  transition: box-shadow 0.2s ease;
+  transition: background-color 0.3s ease;
 }
 
-/* Barrita del color del animal mientras toca */
-.fila-animal--activo {
-  box-shadow: inset 5px 0 0 var(--color-animal);
-}
-
-.fila-animal--fuera .fila-animal__quien {
-  opacity: 0.55;
+.fila-animal--fuera .fila-animal__quien,
+.fila-animal--fuera .partitura {
+  opacity: 0.6;
 }
 
 .fila-animal__quien {
@@ -118,8 +114,8 @@
   font-weight: 800;
 }
 
-.estado--activo { background: var(--relleno); }
-.estado--espera { background: var(--relleno); color: #3d3d38; }
+.estado--activo { background: #ffffff; }
+.estado--espera { background: #ffffff; color: #3d3d38; }
 .estado--fuera { background: var(--alerta-fondo); color: var(--alerta-texto); }
 
 .partitura {
@@ -141,7 +137,7 @@
   font-weight: 800;
   color: #ffffff;
   overflow: hidden;
-  background: var(--relleno);
+  background: #ffffff;
 }
 
 .celda--toque {
@@ -150,7 +146,7 @@
 
 /* Sin señal: rayado gris, sin competir con el color de los que sí tocan */
 .celda--sin {
-  background: repeating-linear-gradient(-45deg, var(--relleno) 0 4px, #e2e2da 4px 8px);
+  background: repeating-linear-gradient(-45deg, #ffffff 0 4px, rgb(255 255 255 / 45%) 4px 8px);
   color: var(--tinta-tenue);
 }
 

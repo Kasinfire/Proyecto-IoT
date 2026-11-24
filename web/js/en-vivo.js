@@ -196,15 +196,15 @@ function pintarFilas() {
     const celdas = estado.animales[id].celdas;
     const tocadas = celdas.filter((c) => c?.tipo === 'toque').length;
 
-    // La fila siempre es blanca: el color del animal queda solo en su carita, la barrita y las casillas.
-    return el('article', { class: `fila-animal fila-animal--${sit}`, style: `--color-animal: var(--${id}-fuerte)` },
+    // Cada fila siempre lleva el color de su animal; el estado lo dice la etiqueta, no el fondo.
+    return el('article', { class: `fila-animal fila-animal--${sit}`, style: `--color-animal: var(--${id}-fuerte); background: var(--${id}-claro)` },
       el('div', { class: 'fila-animal__quien' },
-        cuadroCara(id, 46, 34),
+        cuadroCara(id, 46, 34, '#ffffff'),
         el('div', {},
           el('h3', { class: 'fila-animal__nombre' }, nombre),
           el('p', { class: 'fila-animal__parte' }, parte))),
       el('div', { class: 'fila-animal__estado' },
-        el('span', { class: `estado estado--${sit}`, style: sit === 'activo' ? { background: `var(--${id}-claro)` } : null }, icono(iconoEstado, 14, 2.6), etiqueta),
+        el('span', { class: `estado estado--${sit}` }, icono(iconoEstado, 14, 2.6), etiqueta),
         el('span', { class: 'fila-animal__detalle' }, textoDetalle(id))),
       el('div', { class: 'partitura', role: 'img', 'aria-label': `${nombre}: tocó en ${tocadas} de los últimos ${CELDAS} segundos` },
         celdas.map((c) => {
