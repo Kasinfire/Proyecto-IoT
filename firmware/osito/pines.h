@@ -8,10 +8,9 @@ constexpr uint8_t BOTON_MODO = 27;     // a GND, con INPUT_PULLUP
 constexpr uint8_t LED_MODO_A = 18;
 constexpr uint8_t LED_MODO_B = 19;
 constexpr uint8_t LED_ALERTA = 21;
-// Teclado DJ 4x4 de membrana, conectado a 13, 14, 16, 17, 22, 23, 32, 33. En el montaje el
-// conector quedó volteado (probado tecla por tecla el 2026-11-23): las filas 1..4 llegan a
-// 33, 32, 23, 22 y las columnas 1..4 a 17, 16, 14, 13. Ninguno es pin de arranque y todos
-// tienen pull-up interno.
-constexpr uint8_t TECLADO_FILAS[] = {33, 32, 23, 22};
-constexpr uint8_t TECLADO_COLUMNAS[] = {17, 16, 14, 13};
+// Teclado DJ 4x4 de membrana: sus cables 1 a 8 van a 13, 14, 16, 17, 22, 23, 32, 33. Filas y
+// columnas según las teclas que llegaron el 2026-11-24; si se voltea el conector, se intercambian.
+// Ninguno es pin de arranque y todos tienen pull-up interno.
+constexpr uint8_t TECLADO_FILAS[] = {13, 14, 16, 17};
+constexpr uint8_t TECLADO_COLUMNAS[] = {22, 23, 32, 33};
 }  // namespace pines

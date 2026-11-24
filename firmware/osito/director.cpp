@@ -44,6 +44,16 @@ Parte partes[protocolo::NUM_NODOS] = {};
 // Libre/Simón: lo que está sonando por gesto.
 uint8_t teclas_sonando[protocolo::NUM_NOTAS] = {};  // nota MIDI o SIN_NOTA
 uint8_t nota_ranita = SIN_NOTA;
+// Canción guiada. Lo que la canción tiene escrito ahora en cada parte, aunque no se oiga.
+bool guia_fondo = true;
+uint8_t escritas[protocolo::NUM_NODOS] = {};  // nota MIDI o SILENCIO
+uint8_t melodia_anterior = canciones::SILENCIO;
+uint32_t melodia_desde_ms = 0;
+struct TeclaGuia {
+  uint8_t nota;     // o SIN_NOTA
+  uint8_t armonia;  // o SIN_NOTA
+};
+TeclaGuia teclas_guia[protocolo::NUM_NOTAS] = {};
 constexpr size_t GOLPE_MAX_NOTAS = 3;
 uint8_t notas_golpe[GOLPE_MAX_NOTAS] = {};
 size_t num_notas_golpe = 0;
@@ -118,7 +128,29 @@ void soltarPista() {
   }
 }
 
+void soltarGuia(TeclaGuia& tecla) {
+  if (tecla.nota != SIN_NOTA) {
+    sinte->notaOff(config::CANAL_GUIA, tecla.nota);
+  }
+  if (tecla.armonia != SIN_NOTA) {
+    sinte->notaOff(config::CANAL_GUIA, tecla.armonia);
+  }
+  tecla = {SIN_NOTA, SIN_NOTA};
+}
+
+void soltarGuias() {
+  for (TeclaGuia& tecla : teclas_guia) {
+    soltarGuia(tecla);
+  }
+}
+
 void apagarTodo() {
+  soltarGuias();
+  melodia_anterior = canciones::SILENCIO;
+  melodia_desde_ms = 0;
+  for (uint8_t& escrita : escritas) {
+    escrita = canciones::SILENCIO;
+  }
   soltarLoop();
   soltarPista();
   tono = nullptr;
@@ -147,6 +179,121 @@ void apagarTodo() {
   hay_respuesta = false;
 }
 
+// "prueba" es para oír que cada parte entra y sale con su animal: ahí no hay guía.
+bool hayGuia() {
+  return cancion_actual != &canciones::PRUEBA;
+}
+
+constexpr uint8_t SEMITONOS = 12;
+constexpr uint8_t DO_CENTRAL = 60;
+constexpr uint8_t ESCALA[protocolo::NUM_NOTAS] = {0, 2, 4, 5, 7, 9, 11};
+
+// Tecla del gatito de una nota; un sostenido cae en la tecla de abajo.
+uint8_t teclaDe(uint8_t nota_midi) {
+  uint8_t tecla = 0;
+  while (tecla + 1u < protocolo::NUM_NOTAS && ESCALA[tecla + 1] <= nota_midi % SEMITONOS) {
+    ++tecla;
+  }
+  return tecla;
+}
+
+// La nota con ese nombre (do, re...) más cercana a `cerca`.
+uint8_t masCercana(uint8_t nota_midi, uint8_t cerca) {
+  int nota = nota_midi % SEMITONOS;
+  while (nota + SEMITONOS / 2 < cerca) {
+    nota += SEMITONOS;
+  }
+  return static_cast<uint8_t>(nota);
+}
+
+// Una nota que la canción ya está tocando (violín o bajo) y no repite la de la melodía.
+uint8_t armoniaDe(uint8_t nota_midi) {
+  for (const Nodo nodo : {Nodo::Ranita, Nodo::Osito}) {
+    const uint8_t escrita = escritas[protocolo::aEntero(nodo)];
+    if (escrita != canciones::SILENCIO && escrita % SEMITONOS != nota_midi % SEMITONOS) {
+      return masCercana(escrita, nota_midi);
+    }
+  }
+  return nota_midi + SEMITONOS;
+}
+
+// La nota de la melodía que esa tecla acierta (la de ahora, la que acaba de pasar o la que ya
+// viene), o SILENCIO.
+uint8_t melodiaAcertada(uint8_t tecla, uint32_t ahora_ms) {
+  const uint8_t actual = escritas[protocolo::aEntero(Nodo::Gatito)];
+  if (actual != canciones::SILENCIO && teclaDe(actual) == tecla) {
+    return actual;
+  }
+  if (melodia_anterior != canciones::SILENCIO && teclaDe(melodia_anterior) == tecla &&
+      ahora_ms - melodia_desde_ms <= config::GUIA_TOLERANCIA_MS) {
+    return melodia_anterior;
+  }
+  const canciones::Parte& datos = cancion_actual->partes[protocolo::aEntero(Nodo::Gatito)];
+  const Parte& parte = partes[protocolo::aEntero(Nodo::Gatito)];
+  if (datos.num_pasos == 0) {
+    return canciones::SILENCIO;
+  }
+  const uint8_t siguiente = datos.pasos[parte.paso].nota_midi;
+  const uint32_t falta_ms =
+      (parte.pulsos_restantes + 1u) * pulsoMs() - (ahora_ms - ultimo_pulso_ms);
+  const bool ya_viene = falta_ms <= config::GUIA_TOLERANCIA_MS;
+  return siguiente != canciones::SILENCIO && ya_viene && teclaDe(siguiente) == tecla
+             ? siguiente
+             : canciones::SILENCIO;
+}
+
+// Una tecla que no es la de la melodía toca la nota más cercana de lo que ya suena.
+uint8_t notaDelAcorde(uint8_t tecla) {
+  const uint8_t pedida = DO_CENTRAL + ESCALA[tecla];
+  uint8_t mejor = PENTATONICA_GATITO[tecla];
+  int menor = SEMITONOS;
+  for (const uint8_t escrita : escritas) {
+    if (escrita == canciones::SILENCIO ||
+        &escrita == &escritas[protocolo::aEntero(Nodo::Pollito)]) {  // percusión: no es un tono
+      continue;
+    }
+    const uint8_t nota = masCercana(escrita, pedida);
+    const int lejos = nota > pedida ? nota - pedida : pedida - nota;
+    if (lejos < menor) {
+      menor = lejos;
+      mejor = nota;
+    }
+  }
+  return mejor;
+}
+
+// Canción: la tecla del niño en el gatito.
+void tocarGuia(const interprete::Evento& evento, uint32_t ahora_ms) {
+  TeclaGuia& tecla = teclas_guia[evento.valor];
+  soltarGuia(tecla);
+  if (evento.velocidad == protocolo::VELOCIDAD_SOLTO || !hayGuia() ||
+      silenciados[protocolo::aEntero(Nodo::Gatito)]) {
+    return;
+  }
+  const uint8_t acertada = melodiaAcertada(evento.valor, ahora_ms);
+  if (acertada == canciones::SILENCIO) {
+    tecla.nota = notaDelAcorde(evento.valor);
+    sinte->notaOn(config::CANAL_GUIA, tecla.nota, config::VELOCIDAD_GUIA_OTRA);
+    return;
+  }
+  tecla = {acertada, armoniaDe(acertada)};
+  sinte->notaOn(config::CANAL_GUIA, tecla.nota, config::VELOCIDAD_GUIA_ACIERTO);
+  sinte->notaOn(config::CANAL_GUIA, tecla.armonia, config::VELOCIDAD_GUIA_ARMONIA);
+}
+
+// El LED del gatito que toca ahora. Es el mismo mensaje de Simón Dice.
+void iluminarMelodia(const canciones::Paso& paso, uint32_t ahora_ms) {
+  if (paso.nota_midi == canciones::SILENCIO || !hayGuia() ||
+      silenciados[protocolo::aEntero(Nodo::Gatito)] ||
+      !estado_animales::estaConectado(Nodo::Gatito, ahora_ms)) {
+    return;
+  }
+  const uint32_t dura_ms = paso.pulsos * pulsoMs() * config::GUIA_LUZ_PCT / 100;
+  luz_pendiente = {protocolo::aEntero(Nodo::Gatito), teclaDe(paso.nota_midi),
+                   static_cast<uint16_t>(dura_ms > UINT16_MAX ? UINT16_MAX : dura_ms)};
+  hay_luz = true;
+}
+
 // Canción: sube o baja la ganancia de cada parte hacia su objetivo (fade corto).
 void moverGanancias(uint32_t ahora_ms) {
   // loop() corre muchas veces por ms: se avanza por tramos para que el paso no sea siempre 0.
@@ -162,7 +309,9 @@ void moverGanancias(uint32_t ahora_ms) {
         nodo == Nodo::Osito ||
         (estado_animales::estaActivo(nodo, ahora_ms) && !silenciados[protocolo::aEntero(nodo)]);
     Parte& parte = partes[i];
-    const uint8_t objetivo = debe_sonar ? GANANCIA_MAX : 0;
+    const bool de_fondo = nodo == Nodo::Gatito && guia_fondo && hayGuia() &&
+                          !silenciados[protocolo::aEntero(nodo)];
+    const uint8_t objetivo = debe_sonar ? GANANCIA_MAX : de_fondo ? config::GUIA_FONDO_PCT : 0;
     if (parte.ganancia < objetivo) {
       parte.ganancia = parte.ganancia + paso >= objetivo ? objetivo : parte.ganancia + paso;
     } else if (parte.ganancia > objetivo) {
@@ -201,6 +350,12 @@ void tocarPulso(uint32_t ahora_ms) {
       }
       const canciones::Paso& paso = datos.pasos[parte.paso];
       const bool empieza_vuelta = parte.paso == 0;
+      if (nodo == Nodo::Gatito) {
+        melodia_anterior = escritas[i];
+        melodia_desde_ms = ahora_ms;
+        iluminarMelodia(paso, ahora_ms);
+      }
+      escritas[i] = paso.nota_midi;
       parte.paso = (parte.paso + 1) % datos.num_pasos;
       if (nodo == Nodo::Pollito && empieza_vuelta && parte.ganancia > 0) {
         acentoCancion(ahora_ms);
@@ -499,6 +654,10 @@ void iniciar(Sintetizador& sintetizador, uint32_t semilla, uint32_t ahora_ms,
     silenciado = false;
   }
   tempo_pct = 100;
+  guia_fondo = true;
+  for (TeclaGuia& tecla : teclas_guia) {
+    tecla = {SIN_NOTA, SIN_NOTA};
+  }
   num_loop_sonando = 0;
   termino_grabacion = false;
   looper::reiniciar();
@@ -578,6 +737,16 @@ bool elegirCancion(const char* nombre) {
   return true;
 }
 
+void siguienteCancion() {
+  size_t sigue = 0;
+  for (size_t i = 0; i < std::size(canciones::INCLUIDAS); ++i) {
+    if (cancion_actual == &canciones::INCLUIDAS[i]) {
+      sigue = (i + 1) % std::size(canciones::INCLUIDAS);
+    }
+  }
+  elegirCancion(canciones::INCLUIDAS[sigue].nombre);
+}
+
 const canciones::Cancion* cancionEnUso() {
   return cancion_actual;
 }
@@ -600,6 +769,7 @@ Panel panel() {
   p.avance = modo_actual == Modo::Cancion
                  ? static_cast<uint8_t>(pulso_cancion * 100 / pulsos_cancion)
                  : 0;
+  p.guia = guia_fondo;
   return p;
 }
 
@@ -610,10 +780,12 @@ const char* cancion() {
 void alEvento(const interprete::Evento& evento, uint32_t ahora_ms) {
   switch (modo_actual) {
     case Modo::Cancion:
-      // En Canción el gesto activa la parte (estado_animales) y las notas son de la canción;
-      // del pollito solo se cuenta qué tan seguido lo agitan, para sus acentos.
+      // En Canción el gesto activa la parte (estado_animales). Del pollito solo se cuenta qué tan
+      // seguido lo agitan, para sus acentos; las teclas del gatito sí suenan (guía).
       if (evento.clase == interprete::Clase::Agitar && evento.valor > 0) {
         contarSacudida(ahora_ms);
+      } else if (evento.clase == interprete::Clase::Nota) {
+        tocarGuia(evento, ahora_ms);
       }
       break;
     case Modo::Libre:
@@ -645,6 +817,7 @@ bool alternarSilencio(Nodo nodo) {
     sinte->notaOff(canal(Nodo::Ranita), nota_ranita);
     nota_ranita = SIN_NOTA;
   } else if (nodo == Nodo::Gatito) {
+    soltarGuias();
     for (uint8_t& nota : teclas_sonando) {
       if (nota != SIN_NOTA) {
         sinte->notaOff(canal(Nodo::Gatito), nota);
@@ -713,6 +886,11 @@ acompanamiento::Ritmo siguienteRitmo() {
 
 bool alternarAcordes() {
   return acompanamiento::alternarAcordes();
+}
+
+bool alternarGuia() {
+  guia_fondo = !guia_fondo;
+  return guia_fondo;
 }
 
 bool sacarFinGrabacion(size_t& notas_en_loop) {

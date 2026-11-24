@@ -1,6 +1,6 @@
 // Qué hace cada tecla del teclado DJ del osito. No usa Arduino (se prueba en la compu).
-//   A/B/C: modo.  1/2/3: silenciar o devolver a ranita/gatito/pollito.
-//   *: grabar loop (o encimar otra capa).  #: play/stop.  D: deshacer la última capa
+//   A/B/C: modo (A otra vez, ya en Canción: la siguiente canción).  1/2/3: silenciar o devolver a ranita/gatito/pollito.
+//   *: grabar loop (o encimar otra capa); en Canción, piano de fondo sí/no.  #: play/stop.  D: deshacer la última capa
 //   (mantenida 1 s = borrar todo el loop; llega como TECLA_D_LARGA).
 //   7/9: más lento/más rápido.  4: eco.  5: redoble.  6: subida y caída.
 //   8: ritmo de fondo.  0: acordes de fondo.
@@ -28,8 +28,10 @@ constexpr char TECLA_D_LARGA = 'd';
 enum class Tipo : uint8_t {
   Ninguna,
   CambiarModo,
+  SiguienteCancion,
   AlternarSilencio,
   GrabarLoop,
+  Guia,
   AlternarLoop,
   BorrarLoop,
   DeshacerLoop,

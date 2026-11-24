@@ -119,6 +119,12 @@ void atenderTeclado(uint32_t ahora_ms) {
         anunciarModo();
         registrarModo(contrato_mqtt::Origen::Teclado, simulada);
         break;
+      case acciones_dj::Tipo::SiguienteCancion:
+        director::siguienteCancion();
+        Serial.printf("[dj] tecla %c: siguiente canción\n", tecla);
+        anunciarModo();
+        registrarModo(contrato_mqtt::Origen::Teclado, simulada);
+        break;
       case acciones_dj::Tipo::AlternarSilencio: {
         const bool callado = director::alternarSilencio(accion.nodo);
         Serial.printf("[dj] tecla %c: %s %s\n", tecla,
@@ -127,12 +133,12 @@ void atenderTeclado(uint32_t ahora_ms) {
         break;
       }
       case acciones_dj::Tipo::GrabarLoop:
-        if (director::modo() == protocolo::Modo::Cancion) {
-          Serial.println("[dj] tecla *: el loop se graba en Libre (tecla B)");
-          break;
-        }
         director::grabarLoop();
         Serial.println("[dj] tecla *: grabando loop (2 compases, suena el metrónomo)");
+        break;
+      case acciones_dj::Tipo::Guia:
+        Serial.printf("[dj] tecla *: piano de fondo %s\n",
+                      director::alternarGuia() ? "encendido" : "apagado");
         break;
       case acciones_dj::Tipo::AlternarLoop:
         Serial.printf("[dj] tecla #: loop %s\n", director::alternarLoop() ? "sonando" : "parado");

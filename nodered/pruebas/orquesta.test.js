@@ -121,6 +121,9 @@ test('modo con el botón llega sin id; el de Node-RED no se repite', () => {
   const e = (seq, origen) => o.alMqtt('orquesta/osito/evento', sobre('osito', seq, { tipo: 'modo', modo: 'simon', cancion: 'prueba', origen }));
   assert.deepStrictEqual(e(1, 'boton').ws, [{ tipo: 'modo', id: null, ok: true, modo: 'simon', cancion: 'prueba' }]);
   assert.deepStrictEqual(e(2, 'nodered').ws, []);
+  // El osito aceptó el modo pero sigue con otra canción: la pantalla se corrige.
+  const r = o.alMqtt('orquesta/osito/evento', sobre('osito', 3, { tipo: 'modo', modo: 'cancion', cancion: 'estrellita', origen: 'nodered' }));
+  assert.deepStrictEqual(r.ws, [{ tipo: 'modo', id: null, ok: true, modo: 'cancion', cancion: 'Estrellita' }]);
 });
 
 test('estado, volumen en % y cola', () => {

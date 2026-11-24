@@ -35,6 +35,15 @@ constexpr uint32_t FADE_MS = 150;  // "las partes entran y salen con fade corto"
 constexpr uint32_t FADE_CADA_MS = 10;
 constexpr uint8_t EXPRESION_PASO = 8;
 constexpr uint8_t VELOCIDAD_CANCION = 90;
+// Canción guiada: el piano de fondo y lo que toca el niño en el gatito (en su propio canal, para
+// que el fade de la melodía no lo baje).
+constexpr uint8_t GUIA_FONDO_PCT = 30;
+constexpr uint8_t CANAL_GUIA = 13;
+constexpr uint8_t VELOCIDAD_GUIA_ACIERTO = 120;
+constexpr uint8_t VELOCIDAD_GUIA_ARMONIA = 85;
+constexpr uint8_t VELOCIDAD_GUIA_OTRA = 60;
+constexpr uint32_t GUIA_TOLERANCIA_MS = 250;  // antes o después de la nota
+constexpr uint32_t GUIA_LUZ_PCT = 85;         // el hueco separa dos notas iguales seguidas
 // Canciones que manda Node-RED (igual que nodered/arreglo.js).
 constexpr size_t CANCION_PASOS_MAX = 128;  // por parte
 constexpr unsigned long CANCION_PULSOS_MAX = 32;

@@ -11,11 +11,11 @@ bool armar(const director::Panel& panel, char* destino, size_t tamano) {
   const int n = snprintf(
       destino, tamano,
       "{\"tempo\":%u,\"eco\":%s,\"ritmo\":\"%s\",\"acordes\":%s,\"loop\":\"%s\",\"capas\":%u,"
-      "\"callados\":%u,\"nivel\":%u,\"avance\":%u}",
+      "\"callados\":%u,\"nivel\":%u,\"avance\":%u,\"guia\":%s}",
       panel.tempo, panel.eco ? "true" : "false",
       acompanamiento::NOMBRE_RITMO[static_cast<uint8_t>(panel.ritmo)],
       panel.acordes ? "true" : "false", LOOP[static_cast<uint8_t>(panel.loop)], panel.capas,
-      panel.callados, panel.nivel, avance);
+      panel.callados, panel.nivel, avance, panel.guia ? "true" : "false");
   return n > 0 && static_cast<size_t>(n) < tamano;
 }
 }  // namespace panel_json

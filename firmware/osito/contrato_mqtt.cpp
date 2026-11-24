@@ -19,28 +19,28 @@ bool topico(Nodo nodo, const char* ultimo, char* destino, size_t tamano) {
               tamano);
 }
 
-// Apunta justo después de "clave": (saltando espacios), o nullptr.
+// Apunta justo después de "clave": (saltando espacios), o nullptr. El mismo texto puede salir antes
+// como valor ({"modo":"cancion","cancion":...}): solo cuenta si le siguen los dos puntos.
 const char* valorDe(const char* json, const char* clave) {
   char buscado[24];
   if (!cupo(snprintf(buscado, sizeof(buscado), "\"%s\"", clave), sizeof(buscado))) {
     return nullptr;
   }
-  const char* p = strstr(json, buscado);
-  if (p == nullptr) {
-    return nullptr;
-  }
-  p += strlen(buscado);
-  while (*p == ' ') {
+  for (const char* p = strstr(json, buscado); p != nullptr; p = strstr(p, buscado)) {
+    p += strlen(buscado);
+    while (*p == ' ') {
+      ++p;
+    }
+    if (*p != ':') {
+      continue;
+    }
     ++p;
+    while (*p == ' ') {
+      ++p;
+    }
+    return p;
   }
-  if (*p != ':') {
-    return nullptr;
-  }
-  ++p;
-  while (*p == ' ') {
-    ++p;
-  }
-  return p;
+  return nullptr;
 }
 
 bool leerEntero(const char* json, const char* clave, long long& valor) {

@@ -35,6 +35,9 @@ constexpr unsigned long SALUDO_TLS_S = 10;
 // Con picos de 3 s en el Wi-Fi, una espera corta da por caída una conexión que solo va lenta.
 constexpr uint16_t ESPERA_MQTT_S = 10;
 constexpr size_t MENSAJES_POR_VUELTA = 8;
+// Sin hora no hay TLS. Primero se le pide a la laptop del broker (herramientas/servidor_hora.py),
+// que no necesita internet; luego a time.cloudflare.com por IP, por si la red no tiene DNS.
+constexpr char HORA_POR_IP[] = "162.159.200.123";
 constexpr size_t TAG_CIFRADO_BYTES = 16;
 constexpr size_t SOBRE_MAX = cifrado::NONCE_BYTES + config::EVENTO_JSON_MAX + TAG_CIFRADO_BYTES;
 constexpr size_t BASE64_MAX = ((SOBRE_MAX + 2) / 3) * 4 + 1;
@@ -235,7 +238,7 @@ void TransporteMqttReal::vueltaDeTarea() {
                   static_cast<unsigned>(WiFi.channel()));
   }
   if (!ntp_iniciado_) {
-    configTime(0, 0, "pool.ntp.org", "time.cloudflare.com");
+    configTime(0, 0, host_.c_str(), HORA_POR_IP, "pool.ntp.org");
     ntp_iniciado_ = true;
   }
 
@@ -313,6 +316,7 @@ void TransporteMqttReal::buscarRed() {
 bool TransporteMqttReal::conectarBroker() {
   // Sin hora válida el certificado no se puede validar: esperar al NTP.
   if (time(nullptr) < static_cast<time_t>(config::HORA_VALIDA_DESDE)) {
+    Serial.println("[MQTTS] Esperando la hora (NTP) para validar el certificado");
     return false;
   }
   char id_cliente[40];

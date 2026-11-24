@@ -236,10 +236,11 @@ class Orquesta {
   alPanel(datos, salida) {
     if (!Number.isFinite(datos.tempo)) return;
     const n = (x) => (Number.isFinite(x) ? x : 0);
-    const { tempo, eco, ritmo, acordes, loop, capas, callados, nivel, avance } = datos;
+    const { tempo, eco, ritmo, acordes, loop, capas, callados, nivel, avance, guia } = datos;
     this.panel = {
       tipo: 'panel', tempo, eco: eco === true, ritmo: String(ritmo), acordes: acordes === true, loop: String(loop),
       capas: n(capas), callados: NODOS.filter((_, i) => n(callados) & (1 << i)), nivel: n(nivel),
+      guia: guia === true,
     };
     salida.ws.push(this.panel);
     if (this.datos.modo === 'cancion') salida.ws.push({ tipo: 'cancion', progreso: n(avance) / 100 });
@@ -406,17 +407,20 @@ class Orquesta {
         if (sesion) sesion.resumen.gestos.pollito += 1;
         salida.ws.push({ tipo: 'agitar', nodo, intensidad: evento.intensidad });
         break;
-      case 'modo':
+      case 'modo': {
         if (!MODOS.includes(evento.modo)) break;
+        // Lo que dice el osito manda: si no toca lo que se pidió, la pantalla debe saberlo.
+        const distinta = evento.cancion !== this.datos.cancion;
         this.datos.modo = evento.modo;
         this.datos.cancion = evento.cancion;
         if (evento.origen === 'arranque') this.cancionCambiada = false;
         this.anotarModo(evento.modo);
         // El que pidió Node-RED ya llegó por el acuse, con su id.
-        if (evento.origen !== 'nodered') {
+        if (evento.origen !== 'nodered' || distinta) {
           salida.ws.push({ tipo: 'modo', id: null, ok: true, modo: evento.modo, cancion: this.nombreCancion() });
         }
         break;
+      }
       case 'simon':
         if (evento.resultado) {
           if (sesion) {

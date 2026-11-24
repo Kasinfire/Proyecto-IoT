@@ -321,6 +321,125 @@ void pruebasCancion() {
   revisar("cancion: \"prueba\" si existe", director::elegirCancion("prueba"));
 }
 
+// SIMULACIÓN. Estrellita: pulso 280, melodía do do sol sol la la..., 2 pulsos por nota.
+void pruebasGuia() {
+  using interprete::Clase;
+  constexpr uint8_t C_GUIA = config::CANAL_GUIA;
+  constexpr uint8_t TECLA_DO = 0, TECLA_RE = 1, TECLA_SOL = 4;
+  const int gato = protocolo::aEntero(Nodo::Gatito);
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  protocolo::PayloadLuz luz;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t, "estrellita");
+  correr(t, 1000 + 280 * 3);
+  revisar("guia: sin que nadie toque, el piano suena bajito",
+          s.on[C_GATITO] >= 1 && s.exp[C_GATITO] > 20 && s.exp[C_GATITO] < 50);
+  revisar("guia: sin gatito conectado no se manda luz", !director::sacarLuz(luz));
+  revisar("guia: los demas siguen callados", s.on[C_RANITA] == 0 && s.on[C_POLLITO] == 0);
+
+  t = 1000;
+  director::iniciar(s, 7, t, "estrellita");
+  estado_animales::registrarMensaje(Nodo::Gatito, Fuente::Simulacion, t);
+  correr(t, 1000 + 280 + 100, gato);  // suena el primer do
+  revisar("guia: se ilumina la tecla de la melodia",
+          director::sacarLuz(luz) && luz.nodo_destino == gato && luz.led == TECLA_DO &&
+              luz.duracion_ms == 280 * 2 * 85 / 100);
+  revisar("guia: la luz sale una sola vez por nota", !director::sacarLuz(luz));
+  s.limpiar();
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, TECLA_DO, 90), t);
+  revisar("guia: la tecla iluminada suena con armonia", s.on[C_GUIA] == 2);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, TECLA_DO, 0), t);
+  revisar("guia: al soltarla se apagan las dos", s.off[C_GUIA] == 2);
+  s.limpiar();
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, TECLA_RE, 90), t);
+  const int clase_re = s.ultima_on[C_GUIA] % 12;
+  revisar("guia: otra tecla cae en el acorde (do mayor), mas suave y sola",
+          s.on[C_GUIA] == 1 && (clase_re == 0 || clase_re == 4 || clase_re == 7) &&
+              s.ultima_vel[C_GUIA] == config::VELOCIDAD_GUIA_OTRA);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, TECLA_RE, 0), t);
+
+  // El sol es la tercera nota: empieza en el pulso 5.
+  correr(t, 1000 + 280 * 5 - 400, gato);
+  s.limpiar();
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, TECLA_SOL, 90), t);
+  revisar("guia: 400 ms antes todavia no acierta", s.on[C_GUIA] == 1);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, TECLA_SOL, 0), t);
+  correr(t, 1000 + 280 * 5 - 200, gato);
+  s.limpiar();
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, TECLA_SOL, 90), t);
+  revisar("guia: 200 ms antes si acierta", s.on[C_GUIA] == 2);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, TECLA_SOL, 0), t);
+  correr(t, 1000 + 280 * 5 + 200, gato);
+  s.limpiar();
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, TECLA_DO, 90), t);
+  revisar("guia: 200 ms despues todavia cuenta la anterior", s.on[C_GUIA] == 2);
+  s.limpiar();
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  revisar("guia: al cambiar de modo no queda nada colgado", s.off[C_GUIA] == 2);
+
+  director::cambiarModo(protocolo::Modo::Cancion, t);
+  director::alternarSilencio(Nodo::Gatito);
+  s.limpiar();
+  correr(t, t + 280 * 4, gato);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, TECLA_DO, 90), t);
+  revisar("guia: silenciado no hay piano, luz ni teclas",
+          s.on[C_GATITO] == 0 && s.on[C_GUIA] == 0 && !director::sacarLuz(luz));
+  director::alternarSilencio(Nodo::Gatito);
+
+  revisar("guia: se puede apagar el piano de fondo", !director::alternarGuia());
+  correr(t, t + 400, gato);
+  s.limpiar();
+  correr(t, t + 280 * 4, gato);
+  revisar("guia: apagado, el piano calla pero la luz sigue",
+          s.on[C_GATITO] == 0 && director::sacarLuz(luz) && !director::panel().guia);
+  estado_animales::registrarGesto(Nodo::Gatito, t);
+  correr(t, t + 1000, gato);
+  revisar("guia: apagado, si lo tocan suena a todo volumen",
+          s.on[C_GATITO] >= 1 && s.exp[C_GATITO] == 127);
+
+  // Tecla A, ya en Canción: recorre todas y vuelve a la primera.
+  revisar("cancion: A en Cancion pasa a la siguiente; en Libre y Simon pone Cancion",
+          acciones_dj::deTecla('A', protocolo::Modo::Cancion).tipo ==
+                  acciones_dj::Tipo::SiguienteCancion &&
+              acciones_dj::deTecla('A', protocolo::Modo::Libre).tipo ==
+                  acciones_dj::Tipo::CambiarModo &&
+              acciones_dj::deTecla('A', protocolo::Modo::Simon).tipo ==
+                  acciones_dj::Tipo::CambiarModo);
+  director::iniciar(s, 7, t, canciones::INCLUIDAS[0].nombre);
+  bool en_orden = true;
+  for (size_t i = 1; i <= std::size(canciones::INCLUIDAS); ++i) {
+    director::siguienteCancion();
+    en_orden = en_orden && strcmp(director::cancion(),
+                                  canciones::INCLUIDAS[i % std::size(canciones::INCLUIDAS)].nombre) == 0;
+  }
+  revisar("cancion: recorre las incluidas y vuelve a la primera", en_orden);
+  director::elegirCancion("prueba");
+  director::siguienteCancion();
+  revisar("cancion: desde una que no es de la lista va a la primera",
+          strcmp(director::cancion(), canciones::INCLUIDAS[0].nombre) == 0);
+
+  // Todas las teclas, en cada momento de todas las canciones: nada fuera de rango ni colgado.
+  bool sanas = true;
+  for (const canciones::Cancion& c : canciones::INCLUIDAS) {
+    director::iniciar(s, 7, t, c.nombre);
+    for (int i = 0; i < 60; ++i) {
+      correr(t, t + 137, gato);
+      s.limpiar();
+      const uint8_t tecla = static_cast<uint8_t>(i % protocolo::NUM_NOTAS);
+      director::alEvento(gesto(Nodo::Gatito, Clase::Nota, tecla, 90), t);
+      sanas = sanas && s.on[C_GUIA] >= 1 && s.ultima_on[C_GUIA] >= 40 && s.ultima_on[C_GUIA] <= 96;
+      director::alEvento(gesto(Nodo::Gatito, Clase::Nota, tecla, 0), t);
+      sanas = sanas && s.off[C_GUIA] == s.on[C_GUIA];
+    }
+  }
+  revisar("guia: en todas las canciones suena en rango y se suelta", sanas);
+  revisar("guia: en Cancion * es el piano de fondo; en Libre graba",
+          acciones_dj::deTecla('*', protocolo::Modo::Cancion).tipo == acciones_dj::Tipo::Guia &&
+              acciones_dj::deTecla('*', protocolo::Modo::Libre).tipo ==
+                  acciones_dj::Tipo::GrabarLoop);
+}
+
 void pruebasLibre() {
   using interprete::Clase;
   estado_animales::reiniciar();
@@ -1014,7 +1133,7 @@ void pruebasPanel() {
   revisar("panel: estado inicial",
           panel_json::armar(director::panel(), json, sizeof(json)) &&
               strcmp(json, "{\"tempo\":100,\"eco\":false,\"ritmo\":\"apagado\",\"acordes\":false,"
-                           "\"loop\":\"vacio\",\"capas\":0,\"callados\":0,\"nivel\":1,\"avance\":0}") == 0);
+                           "\"loop\":\"vacio\",\"capas\":0,\"callados\":0,\"nivel\":1,\"avance\":0,\"guia\":true}") == 0);
   director::cambiarModo(protocolo::Modo::Libre, t);
   director::alternarEco();
   director::siguienteRitmo();
@@ -1027,7 +1146,7 @@ void pruebasPanel() {
           strstr(json, "\"tempo\":110,\"eco\":true,\"ritmo\":\"tranquilo\"") != nullptr &&
               strstr(json, "\"loop\":\"grabando\",\"capas\":1,\"callados\":8") != nullptr);
   director::Panel largo = {200, true, acompanamiento::Ritmo::Tranquilo, true,
-                           director::EstadoLoop::Grabando, 255, 255, 255, 100};
+                           director::EstadoLoop::Grabando, 255, 255, 255, 100, false};
   revisar("panel: el mas largo cabe", panel_json::armar(largo, json, sizeof(json)));
   director::cambiarModo(protocolo::Modo::Cancion, t);
   correr(t, t + 800);
@@ -1079,6 +1198,19 @@ void pruebasContratoMqtt() {
           leyo && pedido.id == 7 && pedido.modo_valido && pedido.modo == protocolo::Modo::Simon &&
               pedido.trae_cancion && strcmp(pedido.cancion, "estrellita") == 0);
   leyo = contrato_mqtt::leerPedidoModo("{\"id\":8,\"modo\":\"karaoke\"}", pedido);
+  revisar("mqtt: un mensaje sin \"cancion\" no la inventa", !pedido.trae_cancion);
+  leyo = contrato_mqtt::leerPedidoModo(
+      "{\"id\":9,\"modo\":\"cancion\",\"cancion\":\"martinillo\"}", pedido);
+  revisar("mqtt: en modo cancion tambien lee cual cancion",
+          leyo && pedido.modo == protocolo::Modo::Cancion && pedido.trae_cancion &&
+              strcmp(pedido.cancion, "martinillo") == 0);
+  leyo = contrato_mqtt::leerPedidoModo("{\"id\":10,\"modo\":\"cancion\"}", pedido);
+  revisar("mqtt: modo cancion sin cancion -> no trae", leyo && !pedido.trae_cancion);
+  leyo = contrato_mqtt::leerPedidoModo("{\"cancion\":\"cuna\",\"id\":11,\"modo\":\"cancion\"}",
+                                       pedido);
+  revisar("mqtt: en otro orden tambien",
+          leyo && pedido.modo == protocolo::Modo::Cancion && strcmp(pedido.cancion, "cuna") == 0);
+  contrato_mqtt::leerPedidoModo("{\"id\":8,\"modo\":\"karaoke\"}", pedido);
   revisar("mqtt: modo desconocido -> modo_valido=false", leyo && !pedido.modo_valido);
   revisar("mqtt: pedido sin id -> se ignora",
           !contrato_mqtt::leerPedidoModo("{\"modo\":\"libre\"}", pedido));
@@ -1180,6 +1312,7 @@ int main() {
   pruebasAlerta();
   pruebasAntirrebote();
   pruebasCancion();
+  pruebasGuia();
   pruebasLibre();
   pruebasSimon();
   pruebasSimonGestos();

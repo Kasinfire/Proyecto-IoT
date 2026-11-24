@@ -22,7 +22,8 @@ function describir(tecla, p, modo) {
   }
   if (MODO[tecla]) {
     const actual = modo === MODO[tecla][0];
-    return { texto: MODO[tecla][1], estado: actual ? 'modo actual' : null, encendida: actual, sirve: true };
+    const texto = tecla === 'A' && actual ? 'Otra canción' : MODO[tecla][1];
+    return { texto, estado: actual ? 'modo actual' : null, encendida: actual, sirve: true };
   }
   const simple = (texto, estado = null, encendida = false) => ({ texto, estado, encendida, sirve: true });
   if (modo === 'simon') {
@@ -37,7 +38,7 @@ function describir(tecla, p, modo) {
     7: simple('Más lento'), 9: simple('Más rápido', `${p.tempo} %`),
     8: simple('Ritmo', RITMOS[p.ritmo] ?? p.ritmo, p.ritmo !== 'apagado'),
     0: simple('Acordes', p.acordes ? 'encendidos' : 'apagados', p.acordes),
-    '*': modo === 'cancion' ? { texto: 'Grabar loop', estado: 'en Libre', encendida: false, sirve: false }
+    '*': modo === 'cancion' ? simple('Piano de fondo', p.guia ? 'encendido' : 'apagado', Boolean(p.guia))
       : simple(p.capas ? 'Encimar capa' : 'Grabar loop', p.loop === 'grabando' ? 'grabando' : null, p.loop === 'grabando'),
     '#': simple('Loop', LOOPS[p.loop] ?? p.loop, p.loop === 'sonando'),
     D: simple('Deshacer capa', p.capas === 1 ? '1 capa' : `${p.capas} capas`),

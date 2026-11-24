@@ -454,7 +454,10 @@ function pintarResumen() {
 // ---------- Acciones del terapeuta ----------
 
 async function elegirModo(modo, cancion) {
-  if (estado.pendiente) return; // una petición a la vez
+  if (estado.pendiente) { // una petición a la vez
+    pintarCancionElegida();
+    return;
+  }
   if (modo === estado.modo && cancion === estado.cancion) return;
   estado.pendiente = { id: null, modo, cancion, desde: Date.now() };
   estado.sinRespuesta = false;
@@ -498,7 +501,8 @@ async function cargarCanciones() {
 }
 
 function prepararAcciones() {
-  $('cancion').addEventListener('change', (e) => elegirModo(estado.modo, e.target.value));
+  // Elegir canción deja al osito en modo Canción, como en la pantalla de canciones: así se oye.
+  $('cancion').addEventListener('change', (e) => elegirModo('cancion', e.target.value));
 
   $('cerrar-alerta').addEventListener('click', () => {
     estado.alertaCerrada = ANIMALES.filter(({ id }) => estado.animales[id].conectado === false).map((a) => a.id).join(',');

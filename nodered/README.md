@@ -42,7 +42,7 @@ Un mensaje JSON por evento, ya descifrado:
 | `volumen` | `{"tipo":"volumen","nodo":"osito","valor":70}` | Potenciómetro del osito |
 | `modo` | `{"tipo":"modo","id":15,"ok":true,"modo":"simon","cancion":"Estrellita"}` | Respuesta del osito (`orquesta/control/modo/ack`), también si cambiaron el modo con su botón |
 | `simon` | `{"tipo":"simon","nodo":"ranita"}` y luego `{"tipo":"simon","nodo":"ranita","resultado":"acierto"}` | El osito pidió un animal; luego el resultado (`acierto`, `error` o `tiempo`) |
-| `panel` | `{"tipo":"panel","tempo":110,"eco":true,"ritmo":"pop","acordes":false,"loop":"sonando","capas":2,"callados":["pollito"],"nivel":3}` | Cambia algo del teclado DJ (`orquesta/osito/panel`) |
+| `panel` | `{"tipo":"panel","tempo":110,"eco":true,"ritmo":"pop","acordes":false,"loop":"sonando","capas":2,"callados":["pollito"],"nivel":3,"guia":true}` | Cambia algo del teclado DJ (`orquesta/osito/panel`) |
 | `tecla` | `{"tipo":"tecla","tecla":"8"}` | Se apretó una tecla, real o en pantalla |
 | `canciones` | `{"tipo":"canciones"}` | Cambió la lista: volver a pedirla |
 | `grabacion` | `{"tipo":"grabacion","activa":true,"notas":5}` | Avance de la grabación del gatito |

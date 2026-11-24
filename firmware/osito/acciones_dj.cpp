@@ -32,6 +32,9 @@ Accion enSimon(char tecla) {
 Accion deTecla(char tecla, Modo modo_actual) {
   switch (tecla) {  // estas sirven igual en los tres modos
     case 'A':
+      if (modo_actual == Modo::Cancion) {
+        return simple(Tipo::SiguienteCancion);
+      }
       return {Tipo::CambiarModo, Modo::Cancion, Nodo::Osito, 0};
     case 'B':
       return {Tipo::CambiarModo, Modo::Libre, Nodo::Osito, 0};
@@ -51,7 +54,7 @@ Accion deTecla(char tecla, Modo modo_actual) {
   }
   switch (tecla) {
     case '*':
-      return simple(Tipo::GrabarLoop);
+      return simple(modo_actual == Modo::Cancion ? Tipo::Guia : Tipo::GrabarLoop);
     case '#':
       return simple(Tipo::AlternarLoop);
     case 'D':

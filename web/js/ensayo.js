@@ -79,7 +79,7 @@ export function iniciarSimulacion(emitir) {
   Object.keys(conectados).forEach((nodo) => emitir({ tipo: 'estado', nodo, conectado: true }));
   emitir({ tipo: 'red', internet: true, pendientes: 0, guardado: Date.now() });
   emitir({ tipo: 'volumen', nodo: 'osito', valor: 70 });
-  const panel = { tipo: 'panel', tempo: 100, eco: false, ritmo: 'apagado', acordes: false, loop: 'vacio', capas: 0, callados: [], nivel: 1 };
+  const panel = { tipo: 'panel', tempo: 100, eco: false, ritmo: 'apagado', acordes: false, loop: 'vacio', capas: 0, callados: [], nivel: 1, guia: true };
   emitir({ ...panel });
 
   // A los 6 s el pollito "se apaga", para ver la alerta, y a los 15 s vuelve y la alerta se quita sola.
@@ -145,6 +145,7 @@ export function iniciarSimulacion(emitir) {
       const cambios = {
         4: () => { panel.eco = !panel.eco; }, 0: () => { panel.acordes = !panel.acordes; },
         7: () => { panel.tempo = Math.max(50, panel.tempo - 10); }, 9: () => { panel.tempo = Math.min(200, panel.tempo + 10); },
+        '*': () => { if (modo === 'cancion') panel.guia = !panel.guia; },
         8: () => { const r = ['apagado', 'tranquilo', 'pop', 'cumbia']; panel.ritmo = r[(r.indexOf(panel.ritmo) + 1) % 4]; },
       };
       cambios[tecla]?.();
