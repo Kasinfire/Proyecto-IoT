@@ -1,0 +1,318 @@
+/* Piezas que se repiten entre pantallas: encabezado, botones, tarjetas, avisos. */
+
+/* ---------- Encabezado y menú ---------- */
+
+.encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.marca span {
+  font-weight: 500;
+  color: var(--tinta-tenue);
+}
+
+.marca__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--osito-claro);
+  display: grid;
+  place-items: center;
+}
+
+.menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 999px;
+  background: var(--relleno-nav);
+}
+
+.menu a {
+  min-height: var(--objetivo-min);
+  padding: 0 16px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.menu a[aria-current="page"] {
+  background: var(--lima);
+  font-weight: 800;
+}
+
+.encabezado__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------- Botones ---------- */
+
+.boton {
+  min-height: var(--objetivo-min);
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--relleno);
+}
+
+.boton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Una sola acción principal por pantalla */
+.boton--principal {
+  background: var(--violeta);
+  color: #ffffff;
+}
+
+.boton--blanco {
+  background: #ffffff;
+}
+
+.boton--sesion {
+  background: var(--lima-claro);
+  padding-right: 12px;
+}
+
+.boton--alerta {
+  background: var(--alerta-texto);
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.boton--bien {
+  background: var(--bien-boton);
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.boton--aviso {
+  background: var(--aviso-boton);
+  color: #ffffff;
+  font-size: 13px;
+}
+
+/* ---------- Caritas de los animales ---------- */
+
+.cara {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.cuadro-cara {
+  flex: none;
+  border-radius: var(--radio-chico);
+  display: grid;
+  place-items: center;
+}
+
+/* ---------- Avisos ---------- */
+
+.aviso-ensayo {
+  padding: 10px 16px;
+  border-radius: var(--radio-chico);
+  background: var(--lila);
+  color: #3d3a52;
+  font-weight: 600;
+}
+
+.alerta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 20px;
+  background: var(--alerta-fondo);
+}
+
+.alerta__texto {
+  flex: 1 1 380px;
+}
+
+.alerta__titulo {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--alerta-texto);
+}
+
+.alerta__ayuda {
+  font-weight: 500;
+  color: var(--alerta-texto-suave);
+}
+
+.alerta__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.alerta__led {
+  padding: 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--alerta-texto);
+}
+
+/* ---------- Selector ---------- */
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.campo label {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.selector,
+.entrada {
+  min-height: var(--objetivo-min);
+  min-width: 160px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radio-chico);
+  background: var(--relleno);
+  font-weight: 600;
+}
+
+/* Un campo de texto sí necesita borde visible (WCAG 1.4.11): línea inferior de 3.2:1 */
+.entrada {
+  border-bottom: 2px solid #8a8a82;
+  border-radius: 12px 12px 0 0;
+  background: var(--superficie);
+}
+
+/* ---------- Ventanas (dialog) ---------- */
+
+.ventana {
+  width: min(460px, 90vw);
+  border: none;
+  border-radius: 28px;
+  padding: 24px;
+}
+
+.ventana::backdrop {
+  background: rgb(28 28 26 / 45%);
+}
+
+.ventana__contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ventana__titulo {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.ventana__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.ventana__datos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ventana__dato {
+  border-radius: 16px;
+  padding: 10px;
+}
+
+.ventana__dato small {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ventana__dato strong {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.ventana__error {
+  color: var(--alerta-texto);
+  font-weight: 700;
+}
+
+/* ---------- Tarjeta de dato (resumen) ---------- */
+
+.dato {
+  border-radius: 20px;
+  padding: 14px;
+}
+
+.dato__titulo {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dato__valor {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dato__ayuda {
+  font-size: 12px;
+  font-weight: 500;
+  color: #3d3d38;
+}
+
+/* ---------- Marca de confirmado (palomita) ---------- */
+
+.palomita {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--tinta);
+  display: grid;
+  place-items: center;
+}
+
+@media (max-width: 720px) {
+  .menu {
+    order: 3;
+    width: 100%;
+  }
+}

@@ -1,0 +1,595 @@
+/* Acomodo propio de cada pantalla del terapeuta. Los colores salen de base.css. */
+
+.bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ================= En vivo ================= */
+
+.en-vivo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: stretch;
+}
+
+.orquesta {
+  flex: 999 1 720px;
+  min-width: 0;
+  padding: 18px;
+  border-radius: var(--radio-grande);
+  background: var(--rosa);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.orquesta__cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 0 4px;
+}
+
+.orquesta__resumen,
+.orquesta__ayuda {
+  font-weight: 600;
+  color: #3d2a3a;
+}
+
+.orquesta__ayuda {
+  font-size: 12px;
+}
+
+.orquesta__filas {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fila-animal {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radio);
+  background: #ffffff;
+}
+
+.fila-animal__quien {
+  width: 220px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fila-animal__nombre {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.fila-animal__parte {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tinta-suave);
+}
+
+.fila-animal__estado {
+  width: 190px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.fila-animal__detalle {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.estado {
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.estado--activo { background: #ffffff; }
+.estado--espera { background: var(--relleno); color: #3d3d38; }
+.estado--fuera { background: var(--alerta-fondo); color: var(--alerta-texto); }
+
+.partitura {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(20, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.celda {
+  height: 28px;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: #ffffff;
+  overflow: hidden;
+}
+
+.celda--sin {
+  background: var(--alerta-fondo);
+  color: var(--alerta-texto);
+}
+
+.en-vivo__lado {
+  flex: 1 1 340px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.modos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modo {
+  min-height: 56px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  font-size: 15px;
+  font-weight: 800;
+  background: var(--relleno);
+}
+
+.modo[aria-checked="true"] {
+  background: var(--lima);
+}
+
+.modo__circulo {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 50%;
+  border: 2px solid #8a8a82;
+  background: #ffffff;
+}
+
+.modo[aria-checked="true"] .modo__circulo {
+  border: 6px solid var(--tinta);
+}
+
+.modo__nombre {
+  flex: 1;
+}
+
+.modo__sello {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.conexion {
+  padding: 14px;
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.conexion--bien { background: var(--bien-fondo); }
+.conexion--aviso { background: var(--aviso-fondo); }
+
+.conexion__fila {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.conexion__icono {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 50%;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+}
+
+.conexion__valor {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.conexion__ayuda {
+  font-size: 12px;
+  font-weight: 500;
+  color: #3d3d38;
+}
+
+.resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+/* ================= Historial ================= */
+
+.titulo-con-filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.filtros-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.historial {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.sesiones {
+  flex: 999 1 720px;
+  min-width: 0;
+  padding: 18px;
+  border-radius: var(--radio-grande);
+  background: var(--lila);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sesiones__cabeza {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 4px;
+  color: #3d3a52;
+}
+
+.sesion {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 14px;
+  border-radius: var(--radio);
+  background: #ffffff;
+}
+
+.sesion__fecha {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border-radius: 16px;
+  background: #f6f4ff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.1;
+}
+
+.sesion__dia { font-size: 20px; font-weight: 800; }
+.sesion__mes { font-size: 11px; font-weight: 700; color: var(--tinta-suave); }
+
+.sesion__que {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.sesion__modos { font-size: 15px; font-weight: 800; }
+
+.sesion__dato {
+  width: 104px;
+  flex: none;
+}
+
+.sesion__dato small {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tinta-suave);
+}
+
+.sesion__dato strong { font-size: 18px; font-weight: 800; }
+
+.sesion__aviso {
+  width: 170px;
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tinta-suave);
+}
+
+.sesion__aviso--hay { color: var(--alerta-texto); }
+
+.vacio {
+  padding: 24px;
+  border-radius: var(--radio);
+  background: #ffffff;
+  font-weight: 600;
+  color: var(--tinta-suave);
+}
+
+.historial__lado {
+  flex: 1 1 340px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.avance {
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--bien-fondo);
+}
+
+.avance__barras {
+  height: 120px;
+  margin-top: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.avance__columna {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.avance__barra {
+  width: 100%;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.avance__barra--ultima { background: var(--bien-boton); }
+
+.avance__fechas {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+}
+
+.avance__fechas span {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1f4a2e;
+}
+
+.reparto {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 16px;
+  background: var(--superficie);
+}
+
+.reparto__nombre { width: 64px; flex: none; font-weight: 800; }
+
+.reparto__pista {
+  flex: 1;
+  height: 12px;
+  border-radius: 999px;
+  background: #e6e6df;
+  overflow: hidden;
+}
+
+.reparto__barra { height: 100%; border-radius: 999px; }
+.reparto__valor { width: 40px; flex: none; text-align: right; font-weight: 800; }
+
+.nota-terapeuta {
+  margin: 0;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--aviso-fondo);
+  font-weight: 500;
+}
+
+.nota-terapeuta footer {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #4a3600;
+}
+
+/* ================= Canciones ================= */
+
+.filtros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.filtro {
+  min-height: var(--objetivo-min);
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  background: var(--relleno);
+}
+
+.filtro[aria-pressed="true"] { background: var(--lima); }
+
+.filtro span {
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+.canciones {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+/* Toda la tarjeta es el botón: objetivo grande (ley de Fitts) y sin botones repetidos */
+.cancion {
+  min-height: 140px;
+  padding: 16px;
+  border: none;
+  border-radius: 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+}
+
+.cancion--tranquilas { background: var(--bien-fondo); }
+.cancion--alegres { background: var(--amarillo); }
+.cancion--navidad { background: var(--alerta-fondo); }
+.cancion--cumpleanos { background: var(--gatito-claro); }
+.cancion[aria-pressed="true"] { background: var(--lima); }
+
+.cancion__arriba {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.cancion__icono {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radio-chico);
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+}
+
+.cancion__elegir {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+}
+
+.cancion__abajo { margin-top: auto; }
+.cancion__nombre { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+.cancion__pie { font-size: 12px; font-weight: 600; color: #3d3d38; }
+
+/* ================= Niños ================= */
+
+.ninos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
+}
+
+.nino {
+  padding: 20px;
+  border-radius: var(--radio-grande);
+  background: var(--superficie);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.nino--en-sesion { background: var(--gatito-claro); }
+
+.nino__cabeza {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.nino__alias {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.nino__sesiones {
+  font-size: 13px;
+  font-weight: 500;
+  color: #3d3d38;
+}
+
+.nino__etiqueta {
+  margin-left: auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--violeta);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.nino__datos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mini-dato {
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #ffffff;
+}
+
+.mini-dato small {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tinta-suave);
+}
+
+.mini-dato strong { font-size: 18px; font-weight: 800; }
+
+.nino__acciones {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

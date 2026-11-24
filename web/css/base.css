@@ -1,0 +1,164 @@
+/* Colores, tipografía y espacios de toda la interfaz. Si algo cambia de color, se cambia aquí. */
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("../fuentes/plus-jakarta-sans.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Press Start 2P";
+  src: url("../fuentes/press-start-2p.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  /* Texto. Todos pasan 4.5:1 sobre blanco y sobre los fondos pastel (WCAG 1.4.3). */
+  --tinta: #1c1c1a;
+  --tinta-suave: #4a4a44;
+  --tinta-tenue: #5f5f58;
+
+  /* Superficies */
+  --fondo: #ffffff;
+  --superficie: #f6f6f1;
+  --relleno: #f1f1ec;
+  --relleno-nav: #f3f3ee;
+
+  /* Acentos: lima = lo elegido, violeta = la acción principal */
+  --lima: #dcf16b;
+  --lima-claro: #eef6c8;
+  --violeta: #6858d4;
+
+  /* Avisos */
+  --alerta-fondo: #ffd9e7;
+  --alerta-texto: #6e1238;
+  --alerta-texto-suave: #3d2a31;
+  --aviso-fondo: #fff0b3;
+  --aviso-boton: #6b4a00;
+  --bien-fondo: #c6ecd6;
+  --bien-boton: #1f5a2e;
+
+  /* Un tono claro por animal (fondos) y uno fuerte (gráficas, ≥ 3:1 sobre blanco, WCAG 1.4.11) */
+  --osito-claro: #ffd3bd;
+  --ranita-claro: #c6ecd6;
+  --gatito-claro: #d9d2ff;
+  --pollito-claro: #ffe27a;
+  --osito-fuerte: #c46a3c;
+  --ranita-fuerte: #3d9a63;
+  --gatito-fuerte: #6858d4;
+  --pollito-fuerte: #b27c00;
+
+  /* Secciones */
+  --rosa: #f6cdef;
+  --lila: #e9e4ff;
+  --amarillo: #ffe27a;
+
+  --radio-grande: 24px;
+  --radio: 18px;
+  --radio-chico: 14px;
+  --objetivo-min: 44px; /* tamaño mínimo de lo que se toca (WCAG 2.5.8 pide 24 px) */
+
+  --letra: "Plus Jakarta Sans", system-ui, sans-serif;
+  --letra-pixel: "Press Start 2P", monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--tinta);
+  font-family: var(--letra);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+/* Foco visible para quien usa teclado */
+:focus-visible {
+  outline: 3px solid var(--violeta);
+  outline-offset: 3px;
+}
+
+.pagina {
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 40px 56px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.titulo-pagina {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.titulo-seccion {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.texto-ayuda {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tinta-suave);
+}
+
+/* Solo para lectores de pantalla */
+.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  .pagina {
+    padding: 24px 20px 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
