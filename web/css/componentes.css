@@ -426,19 +426,20 @@
 }
 
 .ventana__dato {
-  border-radius: 16px;
-  padding: 10px;
+  border-radius: var(--radio);
+  padding: 14px 16px;
   background: var(--superficie);
 }
 
 .ventana__dato small {
   display: block;
-  font-size: 12px;
+  margin-bottom: 4px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .ventana__dato strong {
-  font-size: 18px;
+  font-size: 22px;
   font-weight: 800;
 }
 
@@ -450,25 +451,29 @@
 /* ---------- Tarjeta de dato (resumen) ---------- */
 
 .dato {
-  border-radius: 20px;
-  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: var(--radio-grande);
+  padding: 22px 26px;
   background: var(--superficie);
 }
 
 .dato__titulo {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
 }
 
 .dato__valor {
-  font-size: 24px;
+  font-size: 34px;
+  line-height: 1.1;
   font-weight: 800;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
 .dato__ayuda {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 500;
   color: #3d3d38;
 }
