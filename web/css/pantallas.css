@@ -170,6 +170,14 @@
   background: var(--lima);
 }
 
+.modo {
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.modo:hover { background: var(--relleno-encima); }
+.modo[aria-checked="true"]:hover { background: var(--lima-encima); }
+.modo:active { transform: scale(0.99); }
+
 .modo__circulo {
   width: 18px;
   height: 18px;
@@ -463,6 +471,14 @@
 
 .filtro[aria-pressed="true"] { background: var(--lima); }
 
+.filtro {
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.filtro:hover { background: var(--relleno-encima); }
+.filtro[aria-pressed="true"]:hover { background: var(--lima-encima); }
+.filtro:active { transform: scale(0.97); }
+
 .filtro span {
   font-weight: 600;
   opacity: 0.75;
@@ -492,6 +508,20 @@
 .cancion--navidad { background: var(--alerta-fondo); }
 .cancion--cumpleanos { background: var(--gatito-claro); }
 .cancion[aria-pressed="true"] { background: var(--lima); }
+
+.cancion {
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.cancion:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgb(28 28 26 / 10%);
+}
+
+.cancion:active {
+  transform: translateY(0) scale(0.99);
+  box-shadow: none;
+}
 
 .cancion__arriba {
   width: 100%;
