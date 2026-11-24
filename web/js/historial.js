@@ -3,7 +3,7 @@
 
 import { cuadroCara, datosAnimal } from './caritas.js';
 import { el, fechaCorta, iniciarPagina } from './comun.js';
-import { obtenerHistorial, obtenerNinos } from './api.js';
+import { explicar, obtenerHistorial, obtenerNinos } from './api.js';
 
 const NOMBRE_MODO = { cancion: 'Canción', libre: 'Libre', simon: 'Simón Dice' };
 
@@ -65,6 +65,12 @@ function pintarReparto(reparto) {
 
 async function cargarHistorial() {
   const alias = $('nino').value;
+  if (!alias) {
+    pintarSesiones([], 'nadie todavía');
+    pintarAvance([]);
+    pintarReparto({});
+    return;
+  }
   try {
     const datos = await obtenerHistorial(alias, $('periodo').value);
     pintarSesiones(datos.sesiones, alias);
@@ -72,7 +78,7 @@ async function cargarHistorial() {
     pintarReparto(datos.reparto);
   } catch (error) {
     console.error('[historial] No se pudo cargar:', error);
-    $('lista-sesiones').replaceChildren(el('p', { class: 'vacio' }, 'No se pudo cargar el historial. Revisa que Node-RED y el internet estén funcionando.'));
+    $('lista-sesiones').replaceChildren(el('p', { class: 'vacio' }, explicar(error, 'No se pudo cargar el historial')));
   }
 }
 
@@ -80,7 +86,7 @@ async function arrancar() {
   iniciarPagina();
   try {
     const ninos = await obtenerNinos();
-    $('nino').replaceChildren(...ninos.map((n) => el('option', { value: n.alias }, n.alias)));
+    $('nino').replaceChildren(...ninos.map((n) => el('option', { value: n.alias }, n.nombre ? `${n.nombre} (${n.alias})` : n.alias)));
     // Si llegan desde la tarjeta de un niño (historial.html?alias=B-12), se abre el suyo
     const pedido = new URLSearchParams(location.search).get('alias');
     if (pedido && ninos.some((n) => n.alias === pedido)) $('nino').value = pedido;

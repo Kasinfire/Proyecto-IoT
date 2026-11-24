@@ -3,7 +3,9 @@
 
 import { el, icono, palomita, iniciarPagina } from './comun.js';
 import { conectar } from './conexion.js';
-import { obtenerCanciones, pedirModo } from './api.js';
+import { explicar, obtenerCanciones, pedirModo } from './api.js';
+
+const ESPERA_ACK_MS = 5000;
 
 const TIPOS = {
   tranquilas: { filtro: 'Tranquilas', tarjeta: 'Tranquila' },
@@ -76,19 +78,33 @@ async function elegir(nombre) {
   try {
     // Elegir canción deja al osito en modo Canción
     await pedirModo('cancion', nombre);
+    setTimeout(() => {
+      if (estado.pedida === nombre) dejarDeEsperar('El osito no respondió. Revisa que esté encendido.');
+    }, ESPERA_ACK_MS);
   } catch (error) {
     console.error('[canciones] No se pudo pedir la canción:', error);
-    estado.pedida = null;
-    pintarCanciones();
+    dejarDeEsperar(explicar(error, 'No se pudo cambiar la canción'));
   }
+}
+
+function dejarDeEsperar(texto) {
+  estado.pedida = null;
+  $('error').textContent = texto;
+  $('error').hidden = false;
+  pintarCanciones();
 }
 
 function alEvento(msg) {
   if (msg.tipo === 'sesion' || (msg.tipo === 'modo' && msg.ok)) {
     estado.actual = msg.cancion ?? estado.actual;
     estado.modo = msg.modo ?? estado.modo;
-    if (msg.tipo === 'modo') estado.pedida = null;
+    if (msg.tipo === 'modo') {
+      estado.pedida = null;
+      $('error').hidden = true;
+    }
     pintarCanciones();
+  } else if (msg.tipo === 'modo' && estado.pedida) {
+    dejarDeEsperar('El osito no pudo cambiar a esa canción.');
   }
 }
 

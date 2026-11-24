@@ -16,11 +16,21 @@ async function pedir(ruta, opciones = {}) {
       headers: { 'Content-Type': 'application/json' },
       signal: control.signal,
     });
-    if (!resp.ok) throw new Error(`Node-RED respondió ${resp.status} en ${ruta}`);
+    if (!resp.ok) {
+      const error = new Error(`Node-RED respondió ${resp.status} en ${ruta}`);
+      // La causa que da Node-RED, para poder mostrarla (si no es nuestra respuesta, no hay).
+      error.causa = (await resp.json().catch(() => null))?.error ?? null;
+      throw error;
+    }
     return resp.status === 204 ? null : await resp.json();
   } finally {
     clearTimeout(reloj);
   }
+}
+
+// Texto para la pantalla: la causa si se sabe, o que Node-RED no responde.
+export function explicar(error, queFallo) {
+  return error.causa ? `${queFallo}: ${error.causa}.` : `${queFallo}. Revisa que Node-RED esté encendido.`;
 }
 
 const enviar = (ruta, datos) => pedir(ruta, { method: 'POST', body: JSON.stringify(datos) });
@@ -36,6 +46,11 @@ export function pedirModo(modo, cancion) {
 export function silenciarAviso(silenciar) {
   if (esEnsayo()) return Promise.resolve(null);
   return enviar('/api/aviso', { silenciar });
+}
+
+export function iniciarSesion(alias) {
+  if (esEnsayo()) return Promise.resolve(null);
+  return enviar('/api/sesion/iniciar', { alias });
 }
 
 export function terminarSesion(nota) {
@@ -59,12 +74,29 @@ export function obtenerNinos() {
   return pedir('/api/ninos');
 }
 
-export function agregarNino(alias) {
+// Alias vacío: Node-RED pone el siguiente libre. El nombre es opcional y se queda en la laptop.
+export function agregarNino(alias, nombre) {
   if (esEnsayo()) {
-    ensayo.NINOS.push({ alias, sesiones: 0, simon_pct: null, favorito: null, en_sesion: false });
+    ensayo.NINOS.push({ alias: alias || `N-0${ensayo.NINOS.length + 1}`, nombre, sesiones: 0, simon_pct: null, favorito: null, en_sesion: false });
     return Promise.resolve(null);
   }
-  return enviar('/api/ninos', { alias });
+  return enviar('/api/ninos', { alias, nombre });
+}
+
+export function editarNino(alias, nuevoAlias, nombre) {
+  if (esEnsayo()) {
+    Object.assign(ensayo.NINOS.find((n) => n.alias === alias), { alias: nuevoAlias, nombre });
+    return Promise.resolve(null);
+  }
+  return enviar('/api/ninos/editar', { alias, nuevo_alias: nuevoAlias, nombre });
+}
+
+export function borrarNino(alias) {
+  if (esEnsayo()) {
+    ensayo.NINOS.splice(ensayo.NINOS.findIndex((n) => n.alias === alias), 1);
+    return Promise.resolve(null);
+  }
+  return enviar('/api/ninos/borrar', { alias });
 }
 
 export function obtenerHistorial(alias, periodo) {

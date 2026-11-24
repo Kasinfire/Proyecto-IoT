@@ -16,3 +16,5 @@ __pycache__/
 
 firmware/libraries/*
 !firmware/libraries/OrquestaComun/
+
+nodered/.datos/

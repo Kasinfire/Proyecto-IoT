@@ -1,0 +1,539 @@
+[
+  {
+    "id": "orq_flujo",
+    "type": "tab",
+    "label": "Orquesta",
+    "disabled": false,
+    "info": "Los flujos solo llaman a nodered/orquesta.js"
+  },
+  {
+    "id": "orq_tls",
+    "type": "tls-config",
+    "name": "CA de la orquesta",
+    "cert": "",
+    "key": "",
+    "ca": "${ORQUESTA_CA}",
+    "certname": "",
+    "keyname": "",
+    "caname": "",
+    "servername": "",
+    "verifyservercert": true,
+    "alpnprotocol": ""
+  },
+  {
+    "id": "orq_broker",
+    "type": "mqtt-broker",
+    "name": "Mosquitto",
+    "broker": "${ORQUESTA_BROKER}",
+    "port": "${ORQUESTA_BROKER_PUERTO}",
+    "tls": "orq_tls",
+    "clientid": "orquesta-nodered",
+    "autoConnect": true,
+    "usetls": true,
+    "protocolVersion": "4",
+    "keepalive": "30",
+    "cleansession": true,
+    "autoUnsubscribe": true,
+    "birthTopic": "",
+    "closeTopic": "",
+    "willTopic": ""
+  },
+  {
+    "id": "orq_ws",
+    "type": "websocket-listener",
+    "path": "/ws/orquesta",
+    "wholemsg": "false"
+  },
+  {
+    "id": "orq_in0",
+    "type": "mqtt in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 80,
+    "wires": [
+      [
+        "orq_recibir"
+      ]
+    ],
+    "name": "",
+    "topic": "orquesta/+/evento",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "orq_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0
+  },
+  {
+    "id": "orq_in1",
+    "type": "mqtt in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 130,
+    "wires": [
+      [
+        "orq_recibir"
+      ]
+    ],
+    "name": "",
+    "topic": "orquesta/+/estado",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "orq_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0
+  },
+  {
+    "id": "orq_in2",
+    "type": "mqtt in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 180,
+    "wires": [
+      [
+        "orq_recibir"
+      ]
+    ],
+    "name": "",
+    "topic": "orquesta/osito/volumen",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "orq_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0
+  },
+  {
+    "id": "orq_in3",
+    "type": "mqtt in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 230,
+    "wires": [
+      [
+        "orq_recibir"
+      ]
+    ],
+    "name": "",
+    "topic": "orquesta/osito/cola",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "orq_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0
+  },
+  {
+    "id": "orq_in4",
+    "type": "mqtt in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 280,
+    "wires": [
+      [
+        "orq_recibir"
+      ]
+    ],
+    "name": "",
+    "topic": "orquesta/control/modo/ack",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "orq_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0
+  },
+  {
+    "id": "orq_recibir",
+    "type": "function",
+    "z": "orq_flujo",
+    "x": 400,
+    "y": 180,
+    "wires": [
+      [
+        "orq_wsout"
+      ],
+      [
+        "orq_out"
+      ]
+    ],
+    "name": "descifrar y repartir",
+    "func": "const r = global.get('orquesta').alMqtt(msg.topic, msg.payload);\nfor (const m of r.ws) node.send([{ payload: JSON.stringify(m) }, null]);\nfor (const m of r.mqtt) node.send([null, { topic: m.topic, payload: m.payload }]);\nreturn null;",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": []
+  },
+  {
+    "id": "orq_tic",
+    "type": "inject",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 360,
+    "wires": [
+      [
+        "orq_segundo"
+      ]
+    ],
+    "name": "cada segundo",
+    "props": [],
+    "repeat": "1",
+    "crontab": "",
+    "once": true,
+    "onceDelay": 1,
+    "topic": ""
+  },
+  {
+    "id": "orq_segundo",
+    "type": "function",
+    "z": "orq_flujo",
+    "x": 400,
+    "y": 360,
+    "wires": [
+      [
+        "orq_wsout"
+      ],
+      [
+        "orq_out"
+      ]
+    ],
+    "name": "al segundo",
+    "func": "const r = global.get('orquesta').alSegundo();\nfor (const m of r.ws) node.send([{ payload: JSON.stringify(m) }, null]);\nfor (const m of r.mqtt) node.send([null, { topic: m.topic, payload: m.payload }]);\nreturn null;",
+    "outputs": 2,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": []
+  },
+  {
+    "id": "orq_wsout",
+    "type": "websocket out",
+    "z": "orq_flujo",
+    "x": 700,
+    "y": 180,
+    "wires": [],
+    "name": "",
+    "server": "orq_ws",
+    "client": ""
+  },
+  {
+    "id": "orq_out",
+    "type": "mqtt out",
+    "z": "orq_flujo",
+    "x": 700,
+    "y": 260,
+    "wires": [],
+    "name": "",
+    "topic": "",
+    "qos": "0",
+    "retain": "false",
+    "broker": "orq_broker"
+  },
+  {
+    "id": "orq_wsin",
+    "type": "websocket in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 430,
+    "wires": [
+      []
+    ],
+    "name": "",
+    "server": "orq_ws",
+    "client": ""
+  },
+  {
+    "id": "orq_status",
+    "type": "status",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 480,
+    "wires": [
+      [
+        "orq_conectar"
+      ]
+    ],
+    "name": "se conecta una pantalla",
+    "scope": [
+      "orq_wsin"
+    ]
+  },
+  {
+    "id": "orq_conectar",
+    "type": "function",
+    "z": "orq_flujo",
+    "x": 400,
+    "y": 480,
+    "wires": [
+      [
+        "orq_wsout"
+      ]
+    ],
+    "name": "ponerla al día",
+    "func": "if (msg.status.event !== 'connect' || !msg.status._session) return null;\nfor (const m of global.get('orquesta').alConectar()) node.send({ payload: JSON.stringify(m), _session: msg.status._session });\nreturn null;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": []
+  },
+  {
+    "id": "orq_http0",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 560,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/modo",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http1",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 605,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/aviso",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http2",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 650,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/sesion/actual",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http3",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 695,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/sesion/iniciar",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http4",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 740,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/sesion/terminar",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http5",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 785,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/canciones",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http6",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 830,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/ninos",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http7",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 875,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/ninos",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http8",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 920,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/historial",
+    "method": "get",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_api",
+    "type": "function",
+    "z": "orq_flujo",
+    "x": 400,
+    "y": 720,
+    "wires": [
+      [
+        "orq_resp"
+      ],
+      [
+        "orq_wsout"
+      ],
+      [
+        "orq_espera"
+      ]
+    ],
+    "name": "API",
+    "func": "const metodo = msg.req.method;\n// Otro sitio abierto en el navegador no puede mandar JSON aquí sin permiso.\nif (metodo === 'POST' && !msg.req.is('application/json')) {\n  msg.statusCode = 415;\n  msg.payload = { error: 'se espera JSON' };\n  return [msg, null, null];\n}\nconst r = global.get('orquesta').alHttp(metodo, msg.req.path.replace('/api/', ''), msg.payload);\nmsg.statusCode = r.codigo;\nmsg.headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };\nmsg.payload = r.codigo === 204 ? '' : JSON.stringify(r.cuerpo);\nnode.send([msg, null, null]);\nfor (const m of r.ws) node.send([null, { payload: JSON.stringify(m) }, null]);\nfor (const m of r.mqtt) node.send([null, null, { topic: m.topic, payload: m.payload }]);\nreturn null;",
+    "outputs": 3,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": []
+  },
+  {
+    "id": "orq_resp",
+    "type": "http response",
+    "z": "orq_flujo",
+    "x": 700,
+    "y": 680,
+    "wires": [],
+    "name": "",
+    "statusCode": "",
+    "headers": {}
+  },
+  {
+    "id": "orq_espera",
+    "type": "delay",
+    "z": "orq_flujo",
+    "x": 700,
+    "y": 740,
+    "wires": [
+      [
+        "orq_out"
+      ]
+    ],
+    "name": "la respuesta HTTP llega primero",
+    "pauseType": "delay",
+    "timeout": "150",
+    "timeoutUnits": "milliseconds",
+    "rate": "1",
+    "nbRateUnits": "1",
+    "rateUnits": "second",
+    "randomFirst": "1",
+    "randomLast": "5",
+    "randomUnits": "seconds",
+    "drop": false,
+    "allowrate": false,
+    "outputs": 1
+  },
+  {
+    "id": "orq_http20",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 1000,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/ninos/editar",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http21",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 1045,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/ninos/borrar",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  }
+]

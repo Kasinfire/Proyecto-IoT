@@ -37,6 +37,7 @@ const estado = {
   modo: 'cancion',
   progreso: null,
   estrellas: 0,
+  secuencia: false,        // el reto tiene varios pasos: no se señala a uno solo
   objetivo: null,          // animal que pidió el osito en Simón Dice
   resultado: null,         // { texto, hasta }
   animales: Object.fromEntries(ANIMALES.map((a) => [a.id, { conectado: true, ultimoGesto: 0 }])),
@@ -151,6 +152,7 @@ function alEvento(msg) {
         estado.objetivo = null;
       } else {
         estado.objetivo = msg.nodo;
+        estado.secuencia = (msg.nivel ?? 1) > 1;
         estado.resultado = null;
       }
       break;
@@ -175,13 +177,13 @@ function pintar() {
 
   for (const { id } of ANIMALES) {
     const animal = document.getElementById(`animal-${id}`);
-    const esObjetivo = esSimon && estado.objetivo === id;
+    const esObjetivo = esSimon && !estado.secuencia && estado.objetivo === id;
     const sonando = suena(id);
     if (sonando) tocando += 1;
     animal.classList.toggle('animal--suena', sonando);
     animal.classList.toggle('animal--dormido', !estado.animales[id].conectado);
     animal.classList.toggle('animal--objetivo', esObjetivo && !mostrandoResultado);
-    animal.classList.toggle('animal--tenue', esSimon && Boolean(estado.objetivo) && !esObjetivo);
+    animal.classList.toggle('animal--tenue', esSimon && !estado.secuencia && Boolean(estado.objetivo) && !esObjetivo);
     // Cuando está dormido se cambia el dibujo del gesto por una luna
     const gesto = animal.querySelector('.animal__gesto');
     const quiere = estado.animales[id].conectado ? 'gesto' : 'luna';
@@ -198,11 +200,11 @@ function pintar() {
   document.getElementById('juntos-texto').textContent = tocando === ANIMALES.length ? '¡TODOS!' : '¡JUNTOS!';
 
   const simon = document.getElementById('simon');
-  const texto = mostrandoResultado ? estado.resultado.texto : estado.objetivo ? `¡TOCA A ${NOMBRE_SIMON[estado.objetivo]}!` : null;
+  const texto = mostrandoResultado ? estado.resultado.texto : estado.objetivo && estado.secuencia ? '¡MIRA Y REPITE!' : estado.objetivo ? `¡TOCA A ${NOMBRE_SIMON[estado.objetivo]}!` : null;
   simon.hidden = !esSimon || !texto;
   if (texto && document.getElementById('simon-texto').textContent !== texto) {
     document.getElementById('simon-texto').textContent = texto;
-    document.getElementById('simon-cara').replaceChildren(estado.objetivo && !mostrandoResultado ? cara(estado.objetivo, 56) : '');
+    document.getElementById('simon-cara').replaceChildren(estado.objetivo && !estado.secuencia && !mostrandoResultado ? cara(estado.objetivo, 56) : '');
   }
   document.getElementById('estrellas').hidden = !esSimon;
   document.getElementById('estrellas-cuenta').textContent = String(estado.estrellas);

@@ -5,9 +5,23 @@ WebSocket y por rutas HTTP. Las llaves van en variables de entorno, nunca en `fl
 
 | Archivo | Contenido |
 |---|---|
-| `flows.json` | Flujos: MQTT ↔ WebSocket, rutas `/api/…`, guardado en Supabase (por hacer) |
+| `flows.json`, `flows_cred.json` | Flujos: MQTT ↔ WebSocket y rutas `/api/…`. Las credenciales son `${NODERED_USER}` y `${NODERED_PASSWORD}`, que salen del entorno |
+| `orquesta.js` | Lo que hacen los flujos: descifra, confirma (`sync/ack`), lleva la sesión y responde a las pantallas |
+| `settings.js` | Configuración: solo escucha en esta laptop, editor apagado |
+| `pruebas/` | `node --test nodered/pruebas/*.test.js` |
 
-Para servir la interfaz, en `settings.js` de Node-RED: `httpStatic: '<ruta del repo>/web'`.
+## Arrancar
+
+```sh
+mosquitto -c broker/mosquitto.conf        # en una terminal
+./herramientas/iniciar_nodered.sh         # en otra
+```
+
+Y abrir <http://127.0.0.1:1880/>. Con `ORQUESTA_EDITOR=1` se abre el editor en `/editor` (los cambios
+se hacen en una copia: para conservarlos hay que pasarlos a `flows.json`).
+
+Los datos quedan en `nodered/.datos/orquesta.json` (ignorado por git). **Falta Supabase**: por ahora
+el historial es local. Un evento solo se confirma al osito después de guardarlo.
 
 ## Contrato con la interfaz
 
@@ -37,9 +51,12 @@ Un mensaje JSON por evento, ya descifrado:
 |---|---|---|---|
 | `POST /api/modo` | `{"modo":"cancion","cancion":"Noche de paz"}` | `{"id":15}` | Publica en `orquesta/control/modo`; la confirmación llega por el WebSocket |
 | `POST /api/aviso` | `{"silenciar":true}` | `204` | Silencia o reactiva el sonido de aviso (el LED sigue) |
+| `POST /api/sesion/iniciar` | `{"alias":"A-07"}` | `204` | Abre la sesión con ese niño (una a la vez) |
 | `POST /api/sesion/terminar` | `{"nota":"…"}` | `204` | Cierra la sesión y la guarda en Supabase |
 | `GET /api/sesion/actual` | — | `{"alias":"A-07","inicio":…}` o `null` | |
 | `GET /api/canciones` | — | `[{"nombre":"Estrellita","tipo":"tranquilas","duracion":"1:20"}]` | `tipo`: `tranquilas`, `alegres`, `navidad` o `cumpleanos` |
 | `GET /api/ninos` | — | `[{"alias":"A-07","sesiones":6,"simon_pct":75,"favorito":"gatito","en_sesion":true}]` | |
-| `POST /api/ninos` | `{"alias":"D-04"}` | `204` | Solo alias, nunca nombres |
+| `POST /api/ninos` | `{"alias":"D-04","nombre":"…"}` | `{"alias":"D-04"}` | Basta uno de los dos; sin alias se pone el siguiente libre. El nombre se queda en la laptop |
+| `POST /api/ninos/editar` | `{"alias":"D-04","nuevo_alias":"D-05","nombre":"…"}` | `{"alias":"D-05"}` | Su historial se conserva |
+| `POST /api/ninos/borrar` | `{"alias":"D-04"}` | `204` | Borra también sus sesiones. No si está en sesión |
 | `GET /api/historial?alias=A-07&periodo=mes` | — | `{"sesiones":[{"fecha":"2026-11-20","modos":["cancion","simon"],"minutos":18,"cancion":"Estrellita","gestos":299,"simon":[9,12],"aviso":"Pollito se desconectó"}],"reparto":{"gatito":742,"ranita":510,"pollito":288}}` | Consulta Supabase; `periodo`: `mes`, `trimestre` o `todo` |

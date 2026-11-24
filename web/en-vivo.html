@@ -21,7 +21,8 @@
   </nav>
   <div class="encabezado__acciones">
     <a class="boton" href="proyector.html" target="_blank" rel="noopener">Abrir en proyector</a>
-    <button class="boton" type="button" id="terminar">Terminar sesión</button>
+    <a class="boton boton--principal" href="ninos.html" id="iniciar" hidden>Iniciar sesión</a>
+    <button class="boton" type="button" id="terminar" hidden>Terminar sesión</button>
   </div>
 </header>
 
@@ -80,7 +81,7 @@
 <dialog class="ventana" id="ventana-terminar" aria-labelledby="t-terminar">
   <form class="ventana__contenido" method="dialog" id="form-terminar">
     <h2 class="ventana__titulo" id="t-terminar">¿Terminar la sesión?</h2>
-    <p>Se guardará en el historial y la música se detendrá.</p>
+    <p>Se guardará en el historial. La música del osito sigue sonando.</p>
     <div class="ventana__datos" id="terminar-datos"></div>
     <div class="campo">
       <label for="nota">Nota para la próxima sesión (opcional)</label>

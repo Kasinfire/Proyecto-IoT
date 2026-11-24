@@ -4,7 +4,7 @@
 import { ANIMALES, cara, cuadroCara } from './caritas.js';
 import { el, icono, palomita, haceCuanto, iniciarPagina } from './comun.js';
 import { conectar, esEnsayo, simulador } from './conexion.js';
-import { obtenerCanciones, pedirModo, silenciarAviso, terminarSesion } from './api.js';
+import { explicar, obtenerCanciones, obtenerNinos, pedirModo, silenciarAviso, terminarSesion } from './api.js';
 
 const ACTIVO_MS = 2000;           // un animal está "tocando" si tuvo un gesto hace menos de esto
 const CELDAS = 20;                // segundos que muestra la partitura
@@ -22,6 +22,7 @@ const MODOS = [
 
 const estado = {
   alias: null,
+  nombre: '',               // opcional; solo lo ve el terapeuta
   inicio: null,
   modo: 'cancion',
   cancion: null,
@@ -69,7 +70,10 @@ function alEvento(msg) {
         Object.assign(estado.simon, msg.resumen.simon);
         estado.juntosS = msg.resumen.juntos_s ?? estado.juntosS;
       }
+      if (msg.silenciado !== undefined) estado.silenciado = msg.silenciado;
+      pintarSilencio();
       pintarTitulo();
+      buscarNombre();
       pintarModos();
       pintarCancionElegida();
       break;
@@ -182,7 +186,33 @@ function avanzarSegundo() {
 const $ = (id) => document.getElementById(id);
 
 function pintarTitulo() {
-  $('titulo').textContent = estado.alias ? `Sesión con ${estado.alias}` : 'Sesión en vivo';
+  $('titulo').textContent = estado.alias ? `Sesión con ${quien()}` : 'Sin sesión abierta';
+  // Sin sesión no hay nada que terminar; se abre desde Niños.
+  $('terminar').hidden = !estado.alias;
+  $('iniciar').hidden = Boolean(estado.alias);
+}
+
+function quien() {
+  return estado.nombre ? `${estado.nombre} (${estado.alias})` : estado.alias;
+}
+
+async function buscarNombre() {
+  const alias = estado.alias;
+  estado.nombre = '';
+  if (!alias) return;
+  try {
+    const nino = (await obtenerNinos()).find((n) => n.alias === alias);
+    if (estado.alias !== alias) return; // cambió mientras tanto
+    estado.nombre = nino?.nombre ?? '';
+    pintarTitulo();
+  } catch (error) {
+    console.warn('[en-vivo] No se pudo leer el nombre:', error);
+  }
+}
+
+function pintarSilencio() {
+  $('silenciar').setAttribute('aria-pressed', String(estado.silenciado));
+  $('silenciar').textContent = estado.silenciado ? 'Reactivar sonido' : 'Silenciar sonido';
 }
 
 function pintarFilas() {
@@ -376,12 +406,13 @@ function prepararAcciones() {
 
   $('silenciar').addEventListener('click', async () => {
     estado.silenciado = !estado.silenciado;
-    $('silenciar').setAttribute('aria-pressed', String(estado.silenciado));
-    $('silenciar').textContent = estado.silenciado ? 'Reactivar sonido' : 'Silenciar sonido';
+    pintarSilencio();
     try {
       await silenciarAviso(estado.silenciado);
     } catch (error) {
       console.error('[en-vivo] No se pudo cambiar el sonido de aviso:', error);
+      estado.silenciado = !estado.silenciado; // no se aplicó
+      pintarSilencio();
     }
   });
 
@@ -389,7 +420,7 @@ function prepararAcciones() {
   const ventana = $('ventana-terminar');
   $('terminar').addEventListener('click', () => {
     const [duracion, gestos, simon] = datosResumen();
-    $('t-terminar').textContent = estado.alias ? `¿Terminar la sesión con ${estado.alias}?` : '¿Terminar la sesión?';
+    $('t-terminar').textContent = estado.alias ? `¿Terminar la sesión con ${quien()}?` : '¿Terminar la sesión?';
     $('terminar-datos').replaceChildren(...[duracion, gestos, simon].map((d) => el('div', { class: 'ventana__dato', style: { background: d.fondo } },
       el('small', {}, d.titulo), el('strong', {}, d.valor))));
     $('terminar-error').hidden = true;
@@ -403,7 +434,7 @@ function prepararAcciones() {
       location.href = `historial.html${esEnsayo() ? '?ensayo' : ''}`;
     } catch (error) {
       console.error('[en-vivo] No se pudo terminar la sesión:', error);
-      $('terminar-error').textContent = 'No se pudo guardar. Revisa la conexión con Node-RED e intenta otra vez.';
+      $('terminar-error').textContent = explicar(error, 'No se pudo guardar');
       $('terminar-error').hidden = false;
     }
   });
