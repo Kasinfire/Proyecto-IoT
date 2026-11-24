@@ -1,12 +1,13 @@
 #include "teclado.h"
 
+#include <Arduino.h>
 #include <antirrebote.h>
+#include <enlace.h>
 #include <protocolo.h>
 
 #include <iterator>
 
 #include "config.h"
-#include "enlace_simulado.h"
 #include "pines.h"
 
 namespace {
@@ -27,6 +28,12 @@ Antirrebote teclas[] = {
 static_assert(std::size(teclas) == pines::NUM_TECLAS, "Falta o sobra una tecla");
 static_assert(pines::NUM_TECLAS == protocolo::NUM_NOTAS, "Una tecla por cada nota del protocolo");
 
+void enviarNota(protocolo::Nota nota, uint8_t velocidad) {
+  const bool enviada = enlace::enviar(protocolo::PayloadNota{protocolo::aEntero(nota), velocidad});
+  Serial.printf("[gatito] nota %s vel=%u%s\n", protocolo::NOMBRE_NOTA[protocolo::aEntero(nota)],
+                velocidad, enviada ? "" : " (NO enviada)");
+}
+
 }  // namespace
 
 namespace teclado {
@@ -43,10 +50,10 @@ void actualizar() {
 
     const auto nota = static_cast<protocolo::Nota>(i);
     if (teclas[i].sePresiono()) {
-      enlace_simulado::enviarNota(nota, config::VELOCIDAD_PRESIONAR);
+      enviarNota(nota, config::VELOCIDAD_PRESIONAR);
     }
     if (teclas[i].seSolto()) {
-      enlace_simulado::enviarNota(nota, protocolo::VELOCIDAD_SOLTO);
+      enviarNota(nota, protocolo::VELOCIDAD_SOLTO);
     }
   }
 }

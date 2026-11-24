@@ -1,10 +1,10 @@
 #include "luces.h"
 
 #include <Arduino.h>
+#include <enlace.h>
 #include <protocolo.h>
 
 #include "config.h"
-#include "enlace_simulado.h"
 #include "pines.h"
 #include "teclado.h"
 
@@ -43,7 +43,7 @@ void pedirLuz(uint8_t led, uint16_t duracion_ms) {
 
 void actualizar() {
   const uint32_t ahora_ms = millis();
-  const bool hay_osito = enlace_simulado::hayOsito();
+  const bool hay_osito = enlace::estaConectado(protocolo::Nodo::Osito);
 
   if (!hay_osito && (ahora_ms - ultimo_parpadeo_ms) >= config::PARPADEO_SIN_OSITO_MS) {
     ultimo_parpadeo_ms = ahora_ms;
