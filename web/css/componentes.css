@@ -406,6 +406,7 @@
 .ventana__dato {
   border-radius: 16px;
   padding: 10px;
+  background: var(--superficie);
 }
 
 .ventana__dato small {
@@ -429,6 +430,7 @@
 .dato {
   border-radius: 20px;
   padding: 14px;
+  background: var(--superficie);
 }
 
 .dato__titulo {

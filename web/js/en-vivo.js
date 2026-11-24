@@ -192,24 +192,24 @@ function pintarFilas() {
     const sit = situacion(id);
     const etiqueta = { activo: 'Tocando', espera: 'En espera', fuera: 'Desconectado' }[sit];
     const iconoEstado = { activo: 'onda', espera: 'linea', fuera: 'tache' }[sit];
-    const fondoVacio = sit === 'activo' ? '#ffffff' : 'var(--relleno)';
     const celdas = estado.animales[id].celdas;
     const tocadas = celdas.filter((c) => c?.tipo === 'toque').length;
 
-    return el('article', { class: 'fila-animal', style: { background: sit === 'activo' ? `var(--${id}-claro)` : '#ffffff' } },
+    // La fila siempre es blanca: el color del animal queda solo en su carita, la barrita y las casillas.
+    return el('article', { class: `fila-animal fila-animal--${sit}`, style: `--color-animal: var(--${id}-fuerte)` },
       el('div', { class: 'fila-animal__quien' },
-        cuadroCara(id, 46, 34, sit === 'activo' ? '#ffffff' : `var(--${id}-claro)`),
+        cuadroCara(id, 46, 34),
         el('div', {},
           el('h3', { class: 'fila-animal__nombre' }, nombre),
           el('p', { class: 'fila-animal__parte' }, parte))),
       el('div', { class: 'fila-animal__estado' },
-        el('span', { class: `estado estado--${sit}` }, icono(iconoEstado, 14, 2.6), etiqueta),
+        el('span', { class: `estado estado--${sit}`, style: sit === 'activo' ? { background: `var(--${id}-claro)` } : null }, icono(iconoEstado, 14, 2.6), etiqueta),
         el('span', { class: 'fila-animal__detalle' }, textoDetalle(id))),
       el('div', { class: 'partitura', role: 'img', 'aria-label': `${nombre}: tocó en ${tocadas} de los últimos ${CELDAS} segundos` },
         celdas.map((c) => {
           if (c?.tipo === 'sin') return el('span', { class: 'celda celda--sin' }, '×');
-          const fondo = c?.tipo === 'toque' ? `var(--${id}-fuerte)` : fondoVacio;
-          return el('span', { class: 'celda', style: { background: fondo } }, c?.texto ?? '');
+          if (c?.tipo !== 'toque') return el('span', { class: 'celda' });
+          return el('span', { class: 'celda celda--toque' }, c.texto ?? '');
         })));
   }));
 }
@@ -311,15 +311,15 @@ function datosResumen() {
     ? new Date(estado.inicio).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
     : '—';
   return [
-    { titulo: 'Duración', valor: `${minutos} min`, ayuda: `desde las ${desde}`, fondo: 'var(--lima)' },
-    { titulo: 'Gestos', valor: String(total), ayuda: `Gatito ${g.gatito} · Ranita ${g.ranita} · Pollito ${g.pollito}`, fondo: 'var(--gatito-claro)' },
-    { titulo: 'Simón Dice', valor: `${estado.simon.aciertos} de ${estado.simon.turnos}`, ayuda: 'turnos acertados', fondo: 'var(--amarillo)' },
-    { titulo: 'Tocando juntos', valor: `${Math.floor(estado.juntosS / 60)} min`, ayuda: `${MINIMO_JUNTOS} o más animales a la vez`, fondo: 'var(--osito-claro)' },
+    { titulo: 'Duración', valor: `${minutos} min`, ayuda: `desde las ${desde}` },
+    { titulo: 'Gestos', valor: String(total), ayuda: `Gatito ${g.gatito} · Ranita ${g.ranita} · Pollito ${g.pollito}` },
+    { titulo: 'Simón Dice', valor: `${estado.simon.aciertos} de ${estado.simon.turnos}`, ayuda: 'turnos acertados' },
+    { titulo: 'Tocando juntos', valor: `${Math.floor(estado.juntosS / 60)} min`, ayuda: `${MINIMO_JUNTOS} o más animales a la vez` },
   ];
 }
 
 function pintarResumen() {
-  $('resumen').replaceChildren(...datosResumen().map((d) => el('div', { class: 'dato', style: { background: d.fondo } },
+  $('resumen').replaceChildren(...datosResumen().map((d) => el('div', { class: 'dato' },
     el('p', { class: 'dato__titulo' }, d.titulo),
     el('p', { class: 'dato__valor' }, d.valor),
     el('p', { class: 'dato__ayuda' }, d.ayuda))));
@@ -382,7 +382,7 @@ function prepararAcciones() {
   $('terminar').addEventListener('click', () => {
     const [duracion, gestos, simon] = datosResumen();
     $('t-terminar').textContent = estado.alias ? `¿Terminar la sesión con ${estado.alias}?` : '¿Terminar la sesión?';
-    $('terminar-datos').replaceChildren(...[duracion, gestos, simon].map((d) => el('div', { class: 'ventana__dato', style: { background: d.fondo } },
+    $('terminar-datos').replaceChildren(...[duracion, gestos, simon].map((d) => el('div', { class: 'ventana__dato' },
       el('small', {}, d.titulo), el('strong', {}, d.valor))));
     $('terminar-error').hidden = true;
     ventana.showModal();
