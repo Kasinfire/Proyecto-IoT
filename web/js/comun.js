@@ -76,13 +76,26 @@ export function fechaCorta(iso) {
   return { dia: String(dia), mes: MESES[mes - 1] };
 }
 
+// Pie de página: solo la marca y, en ensayo, el aviso de que los datos son simulados.
+function ponerPie() {
+  const pagina = document.querySelector('.pagina');
+  if (!pagina || pagina.querySelector('.pie')) return;
+  pagina.append(el('footer', { class: 'pie' },
+    el('p', { class: 'pie__marca' }, el('strong', {}, 'Orquesta'), 'Kids'),
+    esEnsayo()
+      ? el('span', { class: 'pie__ensayo', title: 'Los datos son simulados: no vienen de Node-RED ni de los animalitos' },
+        'Modo ensayo')
+      : null));
+}
+
 // Cosas comunes a todas las páginas: logo, aviso de ensayo, enlaces y acceso a la sesión en curso.
 export async function iniciarPagina() {
   ponerLogos();
   mejorarSelectores();
 
+  ponerPie();
+
   if (esEnsayo()) {
-    document.querySelector('[data-aviso-ensayo]')?.removeAttribute('hidden');
     // Para que al navegar se siga en ensayo
     document.querySelectorAll('a[href$=".html"]').forEach((a) => {
       a.href = `${a.getAttribute('href')}?ensayo`;

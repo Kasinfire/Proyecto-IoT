@@ -121,6 +121,35 @@
   font-size: 13px;
 }
 
+/* ---------- Pie de página ---------- */
+
+.pie {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--relleno-encima);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tinta-tenue);
+}
+
+.pie__marca strong {
+  font-weight: 800;
+  color: var(--tinta);
+}
+
+.pie__ensayo {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--lila);
+  color: #3d3a52;
+  font-weight: 700;
+}
+
 /* ---------- Caritas de los animales ---------- */
 
 .cara {
@@ -136,14 +165,6 @@
 }
 
 /* ---------- Avisos ---------- */
-
-.aviso-ensayo {
-  padding: 10px 16px;
-  border-radius: var(--radio-chico);
-  background: var(--lila);
-  color: #3d3a52;
-  font-weight: 600;
-}
 
 .alerta {
   display: flex;
