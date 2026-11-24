@@ -21,10 +21,11 @@ completa está en [`orquesta-proyecto.md`](../../orquesta-proyecto.md).
 - Broker: TLS validado contra `certs/ca.crt`; usuario `osito` publica lo permitido, la ACL bloquea
   `control/modo` y una contraseña mala da `not authorised`.
 
-**Simulación:** `./pruebas/correr.sh` en la compu: **154 de 154 pruebas**. Son de lógica, con stubs y
+**Simulación:** `./pruebas/correr.sh` en la compu: **197 de 197 pruebas**. Son de lógica, con stubs y
 sin placa: no comprueban ESP-NOW, el cifrado, el TLS ni el hardware.
 
-**Pendiente en físico:** el rojo del GPIO21 ante una desconexión; el looper y los efectos con sonido;
+**Pendiente en físico:** el rojo del GPIO21 ante una desconexión; el Simón progresivo, la banda de fondo, el looper y
+los efectos con sonido;
 que ESP-NOW y la cola sobrevivan a una caída de Wi-Fi o del broker; la ranita en el canal 6.
 
 ## Qué hace cada módulo
@@ -44,7 +45,8 @@ que ESP-NOW y la cola sobrevivan a una caída de Wi-Fi o del broker; la ranita e
 | `sintetizador.h`                   | Interfaz de audio; `SintetizadorRegistro` imprime cada nota y la laptop la toca | —            |
 | `teclado_dj`                       | Lee el teclado 4x4 sin bloquear, con antirrebote por tecla              | sí                   |
 | `acciones_dj`                      | Qué hace cada tecla                                                     | no                   |
-| `looper`, `efectos_dj`             | Looper (graba y encima capas) y efectos: eco, redoble, subida, octava, pío | no                |
+| `looper`, `efectos_dj`             | Looper (encima y deshace capas) y efectos: eco, redoble, subida y caída | no                   |
+| `acompanamiento`                   | Banda de fondo: ritmos y acordes                                        | no                   |
 | `contrato_mqtt`, `cola_eventos`    | JSON, tópicos MQTT y cola que espera el acuse                           | no                   |
 | `nube`, `transporte_*`             | Cola de eventos y MQTTS real (en su propia tarea); simulador aislado    | sí                   |
 
@@ -104,14 +106,29 @@ y los animales lo cuentan para `enlace::estaConectado(Nodo::Osito)`.
 ## Teclado DJ
 
 ```
-1 silenciar ranita   2 silenciar gatito   3 silenciar pollito   A Canción
-4 eco on/off         5 redoble            6 subida y caída      B Libre
-7 más lento          8 octava on/off      9 más rápido          C Simón
-* grabar / encimar   0 pío-pío            # play/stop loop      D borrar loop
+1 callar ranita  2 callar gatito  3 callar pollito  A Canción
+4 eco            5 redoble        6 subida y caída  B Libre
+7 más lento      8 ritmo          9 más rápido      C Simón
+* grabar/encimar 0 acordes        # play/stop       D deshacer (1 s = borrar)
+
+En Simón: 7/9 nivel · * empezar · # repetir el reto · 0 pista · 4 5 6 8 D sin uso
 ```
 
-El loop dura 16 pulsos (4 s a tempo normal), suena en Libre y Simón y se pausa en Canción. Mientras
-graba se oye un metrónomo. Los efectos suenan en los canales 15 y 16, que el fade de Canción no toca.
+El loop dura 16 pulsos (4 s a tempo normal), se graba y suena en Libre, y se pausa en Canción y en
+Simón. Mientras graba se oye un metrónomo. El ritmo (tranquilo, pop, cumbia) y los acordes entran
+en el siguiente compás y siguen el tempo. En Simón calla todo lo que no es el juego.
+
+## Simón Dice
+
+1. Muestra una secuencia: la luz de cada animal **y su nota** al mismo tiempo. Lo que se toque
+   mientras tanto no cuenta.
+2. El niño la repite. Suena lo que tocó y 350 ms después el resultado, para que no se tapen.
+3. Al acertar se agrega un paso (niveles 1 a 6) y todo va más rápido. Al fallar se repite el mismo
+   reto; dos fallos seguidos bajan un nivel.
+
+Solo cuentan gestos que empiezan: si la ranita ya estaba tapada hay que destaparla primero, y los
+rebotes del pollito se ignoran 700 ms. No se pide nada a animales desconectados o callados. Los
+tiempos están en `config.h` (`SIMON_*`).
 
 ## MQTTS y aprovisionamiento
 
@@ -138,7 +155,7 @@ Wi-Fi, NTP, TLS y MQTT corren en una tarea propia (núcleo 0): un broker caído 
 | Tópico | Contenido |
 |---|---|
 | `orquesta/{animal}/evento` | Gestos de los animales, cifrados, por la cola con acuse |
-| `orquesta/osito/evento` | `tipo:"modo"` (con `origen`: arranque, boton, teclado, nodered) y `tipo:"simon"` (pedido y resultado: acierto, error, tiempo); cifrados, por la cola con acuse |
+| `orquesta/osito/evento` | `tipo:"modo"` (con `origen`: arranque, boton, teclado, nodered) y `tipo:"simon"` (pedido, nivel y resultado: acierto, error, tiempo; uno por reto); cifrados, por la cola con acuse |
 | `orquesta/{nodo}/estado` | `{"estado":"online"}` / `{"estado":"offline"}` (LWT del osito), retenido |
 | `orquesta/osito/volumen` | `{"valor":0..127}`, retenido, máximo 2 por segundo |
 | `orquesta/osito/cola` | `{"pendientes":N,"descartados":D}`, retenido |

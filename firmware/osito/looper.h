@@ -5,7 +5,7 @@
 //   grabar() con el loop vacío: empieza en el siguiente pulso y graba config::LOOP_PULSOS;
 //                               al terminar se repite solo.
 //   grabar() con loop:          encima otra capa durante una vuelta, sin dejar de sonar.
-//   alternar():                 play / stop.   borrar(): lo deja vacío.
+//   alternar(): play / stop.  deshacer(): quita la última capa.  borrar(): lo deja vacío.
 #pragma once
 
 #include <protocolo.h>
@@ -25,6 +25,8 @@ void reiniciar();
 void grabar();
 bool alternar();  // devuelve true si quedó sonando
 void borrar();
+// Quita la última capa (o cancela la que se está grabando). false si no había nada.
+bool deshacer();
 
 // Una nota que se tocó en vivo. al_siguiente: llegó en la segunda mitad del pulso, así
 // que se acomoda en el paso que viene.

@@ -48,7 +48,11 @@ def leer_env(ruta):
         linea = linea.strip()
         if linea and not linea.startswith("#") and "=" in linea:
             nombre, _, valor = linea.partition("=")
-            valores[nombre.strip()] = valor.strip().strip('"')
+            valor = valor.strip()
+            # Comillas alrededor del valor, sencillas o dobles: no son parte de él.
+            if len(valor) >= 2 and valor[0] == valor[-1] and valor[0] in "'\"":
+                valor = valor[1:-1]
+            valores[nombre.strip()] = valor
     return valores
 
 

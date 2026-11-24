@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <cola_circular.h>
+#include <esp_random.h>
 
 #include <cstring>
 #include <ctime>
@@ -18,6 +19,7 @@ TransporteMqtt* transporte = nullptr;
 bool estaba_conectado = false;
 uint32_t ultima_publicacion_ms = 0;
 ColaCircular<contrato_mqtt::PedidoModo, config::PEDIDOS_MODO_MAX> pedidos;
+uint32_t arranque = 0;  // distinto en cada encendido
 bool inyectando_simulado = false;  // true mientras se procesa un "sim mqtt ..."
 bool hay_aviso = false;
 bool aviso_silenciar = false;
@@ -160,6 +162,7 @@ void publicarEventos(uint32_t ahora_ms) {
 
 void iniciar(TransporteMqtt& t) {
   transporte = &t;
+  arranque = esp_random() % 1000000;  // 6 dígitos: cabe en el evento más largo
   cola_eventos::reiniciar();
   transporte->iniciar(alMensaje);
 }
@@ -209,7 +212,8 @@ void alEvento(const animales::Recibido& recibido) {
   }
   char json[config::EVENTO_JSON_MAX];
   const uint32_t seq = cola_eventos::reservarSeq();
-  if (contrato_mqtt::armarEvento(seq, horaUnix(), evento, json, sizeof(json))) {
+  if (contrato_mqtt::armarEvento(seq, horaUnix(), evento, json, sizeof(json)) &&
+      contrato_mqtt::agregarArranque(json, sizeof(json), arranque)) {
     const uint32_t antes = cola_eventos::descartados();
     cola_eventos::agregar(seq, protocolo::aEntero(evento.nodo), json);
     if (cola_eventos::descartados() != antes) {
@@ -239,19 +243,21 @@ void alModo(protocolo::Modo modo, const char* cancion, contrato_mqtt::Origen ori
   }
   char json[config::EVENTO_JSON_MAX];
   const uint32_t seq = cola_eventos::reservarSeq();
-  if (contrato_mqtt::armarEventoModo(seq, horaUnix(), modo, cancion, origen, json,
-                                     sizeof(json))) {
+  if (contrato_mqtt::armarEventoModo(seq, horaUnix(), modo, cancion, origen, json, sizeof(json)) &&
+      contrato_mqtt::agregarArranque(json, sizeof(json), arranque)) {
     encolarDelOsito(json, seq);
   }
 }
 
-void alSimon(protocolo::Nodo pedido, simon::Resultado resultado, bool simulado) {
+void alSimon(protocolo::Nodo pedido, simon::Resultado resultado, uint8_t nivel, bool simulado) {
   if (simulado && !transporte->esSimulado()) {
     return;
   }
   char json[config::EVENTO_JSON_MAX];
   const uint32_t seq = cola_eventos::reservarSeq();
-  if (contrato_mqtt::armarEventoSimon(seq, horaUnix(), pedido, resultado, json, sizeof(json))) {
+  if (contrato_mqtt::armarEventoSimon(seq, horaUnix(), pedido, resultado, nivel, json,
+                                      sizeof(json)) &&
+      contrato_mqtt::agregarArranque(json, sizeof(json), arranque)) {
     encolarDelOsito(json, seq);
   }
 }

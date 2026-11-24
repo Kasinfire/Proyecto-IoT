@@ -27,7 +27,8 @@ TransporteMqttReal broker;
 TransporteSimulado broker_simulado;
 bool inicio_radio_intentado = false;
 uint32_t arranque_ms = 0;
-protocolo::Nodo pedido_simon = protocolo::Nodo::Osito;  // a quién le tocó en Simón
+protocolo::Nodo pedido_simon = protocolo::Nodo::Osito;  // primer animal del reto de Simón
+bool reto_simulado = false;
 
 void anunciarModo() {
   const protocolo::Modo modo = director::modo();
@@ -42,9 +43,15 @@ void registrarModo(contrato_mqtt::Origen origen, bool simulado) {
   nube::alModo(director::modo(), director::cancion(), origen, simulado);
 }
 
-// Lo que pasa en Simón con un animal que solo existe en la simulación no va al broker real.
-bool soloSimulado(protocolo::Nodo nodo, uint32_t ahora_ms) {
-  return !estado_animales::estaConectado(nodo, estado_animales::Fuente::Radio, ahora_ms);
+// Un reto con un animal que solo existe en la simulación no va al broker real.
+bool secuenciaSimulada(uint32_t ahora_ms) {
+  for (size_t i = 0; i < simon::largo(); ++i) {
+    if (!estado_animales::estaConectado(simon::pasoDe(i).nodo, estado_animales::Fuente::Radio,
+                                        ahora_ms)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 // El tablero sabe si el osito aceptó el cambio con este acuse.
@@ -72,7 +79,7 @@ void atenderTeclado(uint32_t ahora_ms) {
   char tecla;
   bool simulada = false;
   while (teclado_dj::siguienteTecla(tecla, simulada)) {
-    const acciones_dj::Accion accion = acciones_dj::deTecla(tecla);
+    const acciones_dj::Accion accion = acciones_dj::deTecla(tecla, director::modo());
     switch (accion.tipo) {
       case acciones_dj::Tipo::CambiarModo:
         Serial.printf("[dj] tecla %c\n", tecla);
@@ -89,7 +96,7 @@ void atenderTeclado(uint32_t ahora_ms) {
       }
       case acciones_dj::Tipo::GrabarLoop:
         if (director::modo() == protocolo::Modo::Cancion) {
-          Serial.println("[dj] tecla *: el loop se graba en Libre o Simón (B o C)");
+          Serial.println("[dj] tecla *: el loop se graba en Libre (tecla B)");
           break;
         }
         director::grabarLoop();
@@ -98,13 +105,17 @@ void atenderTeclado(uint32_t ahora_ms) {
       case acciones_dj::Tipo::AlternarLoop:
         Serial.printf("[dj] tecla #: loop %s\n", director::alternarLoop() ? "sonando" : "parado");
         break;
+      case acciones_dj::Tipo::DeshacerLoop:
+        Serial.printf("[dj] tecla D: %s\n",
+                      director::deshacerLoop() ? "última capa quitada" : "no hay capas que quitar");
+        break;
       case acciones_dj::Tipo::BorrarLoop:
         director::borrarLoop();
-        Serial.println("[dj] tecla D: loop borrado");
+        Serial.println("[dj] tecla D mantenida: loop borrado");
         break;
       case acciones_dj::Tipo::CambiarTempo:
         Serial.printf("[dj] tecla %c: tempo %u%%\n", tecla,
-                      director::cambiarTempo(accion.tempo_pct));
+                      director::cambiarTempo(accion.cuanto));
         break;
       case acciones_dj::Tipo::Eco:
         Serial.printf("[dj] tecla 4: eco %s\n", director::alternarEco() ? "encendido" : "apagado");
@@ -117,13 +128,29 @@ void atenderTeclado(uint32_t ahora_ms) {
         director::subida(ahora_ms);
         Serial.println("[dj] tecla 6: subida y caída");
         break;
-      case acciones_dj::Tipo::Octava:
-        Serial.printf("[dj] tecla 8: octava %s\n",
-                      director::alternarOctava() ? "arriba" : "normal");
+      case acciones_dj::Tipo::Ritmo:
+        Serial.printf("[dj] tecla 8: ritmo %s (entra en el siguiente compás)\n",
+                      acompanamiento::NOMBRE_RITMO[static_cast<uint8_t>(director::siguienteRitmo())]);
         break;
-      case acciones_dj::Tipo::Pio:
-        director::pio();
-        Serial.println("[dj] tecla 0: pío-pío");
+      case acciones_dj::Tipo::Acordes:
+        Serial.printf("[dj] tecla 0: acordes %s (en el siguiente compás)\n",
+                      director::alternarAcordes() ? "encendidos" : "apagados");
+        break;
+      case acciones_dj::Tipo::SimonNivel:
+        Serial.printf("[simon] tecla %c: nivel %u\n", tecla,
+                      simon::cambiarNivel(accion.cuanto, ahora_ms));
+        break;
+      case acciones_dj::Tipo::SimonEmpezar:
+        simon::empezar(ahora_ms);
+        Serial.println("[simon] tecla *: empieza de nuevo");
+        break;
+      case acciones_dj::Tipo::SimonRepetir:
+        simon::repetir(ahora_ms);
+        Serial.println("[simon] tecla #: se repite el reto");
+        break;
+      case acciones_dj::Tipo::SimonPista:
+        Serial.printf("[simon] tecla 0: %s\n",
+                      simon::pista() ? "pista" : "la pista solo se da en el turno del niño");
         break;
       default:
         Serial.printf("[dj] tecla %c (sin uso)\n", tecla);
@@ -228,15 +255,26 @@ void loop() {
   protocolo::PayloadLuz luz;
   if (director::sacarLuz(luz)) {
     animales::pedirLuz(luz);
-    pedido_simon = static_cast<protocolo::Nodo>(luz.nodo_destino);
-    nube::alSimon(pedido_simon, simon::Resultado::Nada, soloSimulado(pedido_simon, ahora_ms));
+  }
+  uint8_t nivel = 1;
+  if (director::sacarReto(pedido_simon, nivel)) {
+    Serial.printf("[simon] nivel %u:", nivel);
+    for (size_t i = 0; i < simon::largo(); ++i) {
+      const simon::Paso paso = simon::pasoDe(i);
+      Serial.printf(" %s%s%s", protocolo::NOMBRE_NODO[protocolo::aEntero(paso.nodo)],
+                    paso.nodo == protocolo::Nodo::Gatito ? "-" : "",
+                    paso.nodo == protocolo::Nodo::Gatito ? protocolo::NOMBRE_NOTA[paso.led] : "");
+    }
+    Serial.println();
+    reto_simulado = secuenciaSimulada(ahora_ms);
+    nube::alSimon(pedido_simon, simon::Resultado::Nada, nivel, reto_simulado);
   }
   simon::Resultado resultado;
-  if (director::sacarResultado(resultado)) {
-    Serial.printf("[simon] %s (aciertos=%u errores=%u)\n",
-                  simon::NOMBRE_RESULTADO[protocolo::aEntero(resultado)], simon::aciertos(),
-                  simon::errores());
-    nube::alSimon(pedido_simon, resultado, soloSimulado(pedido_simon, ahora_ms));
+  if (director::sacarResultado(resultado, nivel)) {
+    Serial.printf("[simon] %s en nivel %u (aciertos=%u errores=%u)\n",
+                  simon::NOMBRE_RESULTADO[protocolo::aEntero(resultado)], nivel,
+                  simon::aciertos(), simon::errores());
+    nube::alSimon(pedido_simon, resultado, nivel, reto_simulado);
   }
 
   nube::actualizar();

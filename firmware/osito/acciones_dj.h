@@ -1,8 +1,10 @@
 // Qué hace cada tecla del teclado DJ del osito. No usa Arduino (se prueba en la compu).
 //   A/B/C: modo.  1/2/3: silenciar o devolver a ranita/gatito/pollito.
-//   *: grabar loop (o encimar otra capa).  #: play/stop del loop.  D: borrar el loop.
-//   7/9: más lento/más rápido.
-//   4: eco on/off.  5: redoble.  6: subida y caída.  8: octava on/off.  0: pío-pío.
+//   *: grabar loop (o encimar otra capa).  #: play/stop.  D: deshacer la última capa
+//   (mantenida 1 s = borrar todo el loop; llega como TECLA_D_LARGA).
+//   7/9: más lento/más rápido.  4: eco.  5: redoble.  6: subida y caída.
+//   8: ritmo de fondo.  0: acordes de fondo.
+// En Simón la fila de abajo y 7/9 controlan el juego: 7/9 nivel, * empezar, # repetir, 0 pista.
 #pragma once
 
 #include <protocolo.h>
@@ -21,6 +23,8 @@ inline constexpr char TECLAS[FILAS][COLUMNAS] = {
     {'*', '0', '#', 'D'},
 };
 
+constexpr char TECLA_D_LARGA = 'd';
+
 enum class Tipo : uint8_t {
   Ninguna,
   CambiarModo,
@@ -28,20 +32,25 @@ enum class Tipo : uint8_t {
   GrabarLoop,
   AlternarLoop,
   BorrarLoop,
+  DeshacerLoop,
   CambiarTempo,
   Eco,
   Redoble,
   Subida,
-  Octava,
-  Pio,
+  Ritmo,
+  Acordes,
+  SimonNivel,
+  SimonEmpezar,
+  SimonRepetir,
+  SimonPista,
 };
 
 struct Accion {
   Tipo tipo;
   protocolo::Modo modo;  // solo CambiarModo
   protocolo::Nodo nodo;  // solo AlternarSilencio
-  int tempo_pct;         // solo CambiarTempo: cuánto sube o baja
+  int cuanto;            // CambiarTempo (%) y SimonNivel: cuánto sube o baja
 };
 
-Accion deTecla(char tecla);
+Accion deTecla(char tecla, protocolo::Modo modo_actual);
 }  // namespace acciones_dj

@@ -6,7 +6,6 @@
 
 namespace {
 constexpr uint8_t SIN_NOTA = 0;
-constexpr uint8_t OCTAVA = 12;
 // Subida: do pentatónica hacia arriba, dos octavas.
 constexpr uint8_t NOTAS_SUBIDA[] = {60, 62, 64, 67, 69, 72, 74, 76,
                                     79, 81, 84, 86, 88, 91, 93, 96};
@@ -25,51 +24,30 @@ void EfectosDj::conectar(Sintetizador& salida) {
 
 void EfectosDj::reiniciar() {
   eco_ = false;
-  octava_ = false;
-  for (auto& fila : subio_) {
-    for (uint8_t& semitonos : fila) {
-      semitonos = 0;
-    }
-  }
+  pausado_ = false;
   num_ecos_ = 0;
   num_cortas_ = 0;
   hay_redoble_ = false;
   hay_subida_ = false;
 }
 
-bool EfectosDj::esMelodico(uint8_t canal) const {
-  return canal != config::CANAL_PERCUSION && canal != config::CANAL_DJ_PERCUSION;
-}
-
 void EfectosDj::notaOn(uint8_t canal, uint8_t nota_midi, uint8_t velocidad) {
   if (canal >= CANALES || nota_midi >= NOTAS) {
     return;
   }
-  uint8_t nota = nota_midi;
-  if (octava_ && esMelodico(canal) && nota_midi + OCTAVA < NOTAS) {
-    nota = nota_midi + OCTAVA;
-    subio_[canal][nota_midi] = OCTAVA;
-  } else {
-    subio_[canal][nota_midi] = 0;
-  }
-  salida_->notaOn(canal, nota, velocidad);
+  salida_->notaOn(canal, nota_midi, velocidad);
 
-  if (eco_ && num_ecos_ < ECO_MAX) {
+  if (eco_ && !pausado_ && num_ecos_ < ECO_MAX) {
     const uint8_t eco_vel = velocidad * config::ECO_QUEDA_PCT / 100;
     if (eco_vel > 0) {
-      ecos_[num_ecos_++] = {canal, nota, eco_vel, config::ECO_CADA_PULSOS,
+      ecos_[num_ecos_++] = {canal, nota_midi, eco_vel, config::ECO_CADA_PULSOS,
                             config::ECO_REPETICIONES};
     }
   }
 }
 
 void EfectosDj::notaOff(uint8_t canal, uint8_t nota_midi) {
-  if (canal >= CANALES || nota_midi >= NOTAS) {
-    return;
-  }
-  // Se suelta la misma nota que se encendió, aunque la octava haya cambiado entre medio.
-  salida_->notaOff(canal, nota_midi + subio_[canal][nota_midi]);
-  subio_[canal][nota_midi] = 0;
+  salida_->notaOff(canal, nota_midi);
 }
 
 void EfectosDj::expresion(uint8_t canal, uint8_t valor) {
@@ -122,9 +100,17 @@ bool EfectosDj::alternarEco() {
   return eco_;
 }
 
-bool EfectosDj::alternarOctava() {
-  octava_ = !octava_;
-  return octava_;
+void EfectosDj::pausar(bool pausado) {
+  pausado_ = pausado;
+  if (!pausado) {
+    return;
+  }
+  num_ecos_ = 0;
+  hay_redoble_ = false;
+  if (hay_subida_ && subida_sonando_ != SIN_NOTA) {
+    salida_->notaOff(config::CANAL_DJ_MELODIA, subida_sonando_);
+  }
+  hay_subida_ = false;
 }
 
 void EfectosDj::redoble(uint32_t ahora_ms, uint32_t pulso_ms) {
@@ -189,8 +175,4 @@ void EfectosDj::actualizarSubida(uint32_t ahora_ms) {
   salida_->notaOn(config::CANAL_DJ_MELODIA, subida_sonando_,
                   static_cast<uint8_t>(mezclar(40, 120, pasado * 1000 / subida_dura_ms_)));
   subida_paso_ = toca + 1;
-}
-
-void EfectosDj::pio() {
-  sonarCorta(config::CANAL_DJ_PERCUSION, config::NOTA_PIO, 120);
 }

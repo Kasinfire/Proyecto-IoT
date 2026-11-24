@@ -5,7 +5,8 @@
 namespace teclado_dj {
 void iniciar();
 void actualizar();
-// La siguiente tecla presionada ('1'..'9', '0', 'A'..'D', '*', '#'); false si no hay.
+// La siguiente tecla presionada ('1'..'9', '0', 'A'..'D', '*', '#'), o
+// TECLA_D_LARGA si mantuvieron D; false si no hay.
 // simulada: vino de "sim tecla" (no se publica en el broker real).
 bool siguienteTecla(char& tecla, bool& simulada);
 

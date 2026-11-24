@@ -9,7 +9,7 @@ SALIDA="${TMPDIR:-/tmp}/prueba_osito"
 c++ -std=c++17 -Wall -Wextra -I"$AQUI/stubs" -I"$COMUN" -I"$OSITO" \
   "$AQUI/prueba_logica.cpp" \
   "$OSITO/estado_animales.cpp" "$OSITO/interprete.cpp" "$OSITO/filtro_boton.cpp" \
-  "$OSITO/director.cpp" "$OSITO/acciones_dj.cpp" "$OSITO/looper.cpp" "$OSITO/efectos_dj.cpp" "$OSITO/simon.cpp" \
+  "$OSITO/director.cpp" "$OSITO/acciones_dj.cpp" "$OSITO/looper.cpp" "$OSITO/acompanamiento.cpp" "$OSITO/efectos_dj.cpp" "$OSITO/simon.cpp" \
   "$OSITO/contrato_mqtt.cpp" "$OSITO/cola_eventos.cpp" \
   -o "$SALIDA"
 "$SALIDA"

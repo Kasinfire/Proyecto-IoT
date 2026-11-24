@@ -42,10 +42,13 @@ bool armarEstado(bool en_linea, char* destino, size_t tamano);
 enum class Origen : uint8_t { Arranque, Boton, Teclado, NodeRed };
 bool armarEventoModo(uint32_t seq, uint32_t t, protocolo::Modo modo, const char* cancion,
                      Origen origen, char* destino, size_t tamano);
-// Pedido: {"seq":..,"t":..,"nodo":"osito","tipo":"simon","pedido":"ranita"}
+// Pedido: {"seq":..,"t":..,"nodo":"osito","tipo":"simon","pedido":"ranita","nivel":2}
 // Resultado: igual + "resultado":"acierto|error|tiempo". Resultado::Nada = es el pedido.
 bool armarEventoSimon(uint32_t seq, uint32_t t, protocolo::Nodo pedido, simon::Resultado resultado,
-                      char* destino, size_t tamano);
+                      uint8_t nivel, char* destino, size_t tamano);
+// Agrega "arranque":<n> al final de un evento: seq vuelve a 1 en cada encendido, y con esto
+// Node-RED distingue un evento nuevo de uno repetido.
+bool agregarArranque(char* json, size_t tamano, uint32_t arranque);
 bool armarVolumen(uint8_t valor, char* destino, size_t tamano);
 bool armarCola(size_t pendientes, uint32_t descartados, char* destino, size_t tamano);
 // {"silenciar":true|false}; false si no lo trae.

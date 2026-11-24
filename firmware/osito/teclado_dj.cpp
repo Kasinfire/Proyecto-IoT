@@ -6,6 +6,7 @@
 #include "config.h"
 #include "filtro_boton.h"
 #include "pines.h"
+#include "pulsacion_larga.h"
 
 namespace teclado_dj {
 namespace {
@@ -26,6 +27,8 @@ FiltroBoton filtros[FILAS][COLUMNAS] = {
     {FiltroBoton(config::BOTON_ESTABLE_MS), FiltroBoton(config::BOTON_ESTABLE_MS),
      FiltroBoton(config::BOTON_ESTABLE_MS), FiltroBoton(config::BOTON_ESTABLE_MS)},
 };
+constexpr char TECLA_LARGA = 'D';
+PulsacionLarga larga(config::TECLA_LARGA_MS);
 struct Pulsada {
   char tecla;
   bool simulada;
@@ -68,6 +71,9 @@ void iniciar() {
     leerFila(f, abajo);
     for (size_t c = 0; c < COLUMNAS; ++c) {
       filtros[f][c].iniciar(abajo[c], ahora_ms);
+      if (acciones_dj::TECLAS[f][c] == TECLA_LARGA) {
+        larga.iniciar(abajo[c]);
+      }
     }
   }
 }
@@ -79,7 +85,14 @@ void actualizar() {
     leerFila(f, abajo);
     for (size_t c = 0; c < COLUMNAS; ++c) {
       filtros[f][c].actualizar(abajo[c], ahora_ms);
-      if (filtros[f][c].sePresiono()) {
+      const bool se_presiono = filtros[f][c].sePresiono();
+      if (acciones_dj::TECLAS[f][c] == TECLA_LARGA) {
+        const PulsacionLarga::Tipo tipo = larga.actualizar(filtros[f][c].presionado(), ahora_ms);
+        if (tipo != PulsacionLarga::Tipo::Nada) {
+          meter(tipo == PulsacionLarga::Tipo::Larga ? acciones_dj::TECLA_D_LARGA : TECLA_LARGA,
+                false);
+        }
+      } else if (se_presiono) {
         meter(acciones_dj::TECLAS[f][c], false);
       }
     }

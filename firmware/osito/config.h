@@ -57,6 +57,8 @@ constexpr uint32_t GOLPE_MS = 100;
 // Looper: 16 pulsos de 250 ms = 4 s (2 compases de 4 tiempos) con el tempo normal.
 constexpr uint8_t LOOP_PULSOS = 16;
 constexpr size_t LOOP_NOTAS_MAX = 64;
+constexpr size_t LOOP_CAPAS_MAX = 16;  // cuántas se pueden deshacer
+constexpr uint32_t TECLA_LARGA_MS = 1000;
 constexpr uint8_t PULSOS_POR_TIEMPO = 2;  // el metrónomo suena cada 2 pulsos (cada 0.5 s)
 constexpr uint8_t NOTA_METRONOMO = 37;    // General MIDI, canal 10: golpe de aro
 constexpr uint8_t VELOCIDAD_METRONOMO = 35;
@@ -65,8 +67,9 @@ constexpr uint8_t TEMPO_MIN_PCT = 50;
 constexpr uint8_t TEMPO_MAX_PCT = 200;
 constexpr int TEMPO_PASO_PCT = 10;
 // Efectos del DJ. Sus sonidos van en canales propios para que el fade de Canción no los
-// apague: 15 melodía (piano en la laptop) y 16 percusión (como el 10).
+// apague: 14 acordes, 15 melodía (piano en la laptop) y 16 percusión (como el 10).
 constexpr uint8_t CANAL_PERCUSION = 10;
+constexpr uint8_t CANAL_DJ_ACORDES = 14;
 constexpr uint8_t CANAL_DJ_MELODIA = 15;
 constexpr uint8_t CANAL_DJ_PERCUSION = 16;
 constexpr uint8_t ECO_REPETICIONES = 3;
@@ -75,7 +78,11 @@ constexpr uint8_t ECO_QUEDA_PCT = 60;   // cada repetición suena al 60 % de la 
 constexpr uint8_t REDOBLE_PULSOS = 4;   // 1 s
 constexpr uint8_t SUBIDA_PULSOS = 8;    // 2 s
 constexpr uint8_t NOTA_TAMBOR = 38;     // General MIDI: tambor
+constexpr uint8_t NOTA_BOMBO = 36;
+constexpr uint8_t NOTA_PLATILLO_CERRADO = 42;
+constexpr uint8_t NOTA_CENCERRO = 56;
 constexpr uint8_t NOTA_PLATILLO_CHOQUE = 49;
+constexpr uint8_t VELOCIDAD_ACORDES = 55;
 constexpr uint8_t NOTA_CAIDA = 36;      // do grave del "drop"
 // Sonidos del osito: acierto, error y aviso de animal desconectado.
 constexpr uint8_t VELOCIDAD_AVISO = 100;
@@ -88,9 +95,24 @@ constexpr bool IMPRIMIR_AUDIO = true;
 
 
 // Simón Dice
-constexpr uint16_t SIMON_LUZ_MS = 1500;
+// Del nivel 1 al último: la luz y el hueco se acortan y hay menos tiempo para cada paso.
+constexpr uint8_t SIMON_NIVEL_MAX = 6;  // = pasos de la secuencia
+constexpr uint8_t SIMON_FALLOS_PARA_BAJAR = 2;
+constexpr uint16_t SIMON_LUZ_MS = 900;
+constexpr uint16_t SIMON_LUZ_MIN_MS = 450;
+constexpr uint32_t SIMON_HUECO_MS = 300;
+constexpr uint32_t SIMON_HUECO_MIN_MS = 150;
 constexpr uint32_t SIMON_ESPERA_MS = 5000;
-constexpr uint32_t SIMON_PAUSA_MS = 1500;
+constexpr uint32_t SIMON_ESPERA_MIN_MS = 3000;
+constexpr uint32_t SIMON_PAUSA_MS = 1500;  // deja oír el resultado antes del siguiente reto
+constexpr uint32_t SIMON_PAUSA_CORTA_MS = 600;
+// Tapada, la ranita repite su nivel cada 500 ms; el pollito manda rebotes cada 350 ms.
+constexpr uint32_t SIMON_SOMBRA_VIGENTE_MS = 1200;
+constexpr uint32_t SIMON_REBOTE_POLLITO_MS = 700;
+constexpr uint32_t SIMON_TONO_TRAS_MS = 350;  // primero se oye qué se tocó, luego acierto/error
+constexpr uint32_t SIMON_ARPEGIO_MS = 110;
+constexpr uint8_t SIMON_NOTA_RANITA = 76;
+constexpr uint8_t SIMON_VELOCIDAD = 100;
 
 // MQTT
 constexpr uint16_t PUERTO_MQTTS = 8883;
@@ -105,7 +127,7 @@ constexpr uint32_t COLA_ESTADO_CADA_MS = 1000;
 // RAM: 64 x 160 B = 10 KB. Sin Wi-Fi, a ~2 eventos/s alcanza para ~30 s; lo demás se descarta
 // (el más viejo primero) hasta pasar la cola a LittleFS.
 constexpr size_t CAPACIDAD_COLA_MQTT = 64;
-constexpr size_t EVENTO_JSON_MAX = 160;  // el evento de modo con una canción larga ocupa 135
+constexpr size_t EVENTO_JSON_MAX = 160;  // modo con una canción larga y el arranque: 157
 constexpr size_t TOPICO_MAX = 40;
 constexpr size_t PUBLICAR_POR_VUELTA = 4;
 constexpr uint32_t REPUBLICAR_SIN_ACK_MS = 10000;

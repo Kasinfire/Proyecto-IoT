@@ -1,8 +1,7 @@
 // Efectos del teclado DJ. Se pone entre el director y el sintetizador real: todas las
 // notas (en vivo, del loop y de la canción) pasan por aquí. No usa Arduino.
-//   Octava: lo melódico suena 12 semitonos más agudo (recuerda qué subió para soltarlo bien).
 //   Eco:    cada nota se repite ECO_REPETICIONES veces, cada vez más bajito.
-//   Redoble, subida y caída, pío: los toca el DJ en sus propios canales (CANAL_DJ_*), que el
+//   Redoble, subida y caída: los toca el DJ en sus propios canales (CANAL_DJ_*), que el
 //   fade de Canción no toca.
 #pragma once
 
@@ -28,10 +27,10 @@ class EfectosDj : public Sintetizador {
   void avanzar(uint32_t ahora_ms);
 
   bool alternarEco();     // true si quedó encendido
-  bool alternarOctava();  // true si quedó encendida
   void redoble(uint32_t ahora_ms, uint32_t pulso_ms);
   void subida(uint32_t ahora_ms, uint32_t pulso_ms);
-  void pio();
+  // En Simón: ni eco ni efectos, para que solo se oiga el juego. Al volver sigue el eco.
+  void pausar(bool pausado);
 
  private:
   static constexpr size_t CANALES = 17;  // índice = canal MIDI 1..16
@@ -51,15 +50,13 @@ class EfectosDj : public Sintetizador {
     uint8_t nota;
   };
 
-  bool esMelodico(uint8_t canal) const;
   void sonarCorta(uint8_t canal, uint8_t nota, uint8_t velocidad);
   void actualizarRedoble(uint32_t ahora_ms);
   void actualizarSubida(uint32_t ahora_ms);
 
   Sintetizador* salida_ = nullptr;
   bool eco_ = false;
-  bool octava_ = false;
-  uint8_t subio_[CANALES][NOTAS] = {};  // semitonos que se subió cada nota encendida
+  bool pausado_ = false;
   Eco ecos_[ECO_MAX] = {};
   size_t num_ecos_ = 0;
   Corta cortas_[CORTAS_MAX] = {};

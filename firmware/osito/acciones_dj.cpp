@@ -3,10 +3,34 @@
 #include "config.h"
 
 namespace acciones_dj {
-Accion deTecla(char tecla) {
-  using protocolo::Modo;
-  using protocolo::Nodo;
+namespace {
+using protocolo::Modo;
+using protocolo::Nodo;
+
+Accion simple(Tipo tipo, int cuanto = 0) {
+  return {tipo, Modo::Cancion, Nodo::Osito, cuanto};
+}
+
+Accion enSimon(char tecla) {
   switch (tecla) {
+    case '7':
+      return simple(Tipo::SimonNivel, -1);
+    case '9':
+      return simple(Tipo::SimonNivel, 1);
+    case '*':
+      return simple(Tipo::SimonEmpezar);
+    case '#':
+      return simple(Tipo::SimonRepetir);
+    case '0':
+      return simple(Tipo::SimonPista);
+    default:
+      return simple(Tipo::Ninguna);
+  }
+}
+}  // namespace
+
+Accion deTecla(char tecla, Modo modo_actual) {
+  switch (tecla) {  // estas sirven igual en los tres modos
     case 'A':
       return {Tipo::CambiarModo, Modo::Cancion, Nodo::Osito, 0};
     case 'B':
@@ -19,28 +43,37 @@ Accion deTecla(char tecla) {
       return {Tipo::AlternarSilencio, Modo::Cancion, Nodo::Gatito, 0};
     case '3':
       return {Tipo::AlternarSilencio, Modo::Cancion, Nodo::Pollito, 0};
-    case '*':
-      return {Tipo::GrabarLoop, Modo::Cancion, Nodo::Osito, 0};
-    case '#':
-      return {Tipo::AlternarLoop, Modo::Cancion, Nodo::Osito, 0};
-    case 'D':
-      return {Tipo::BorrarLoop, Modo::Cancion, Nodo::Osito, 0};
-    case '7':
-      return {Tipo::CambiarTempo, Modo::Cancion, Nodo::Osito, -config::TEMPO_PASO_PCT};
-    case '9':
-      return {Tipo::CambiarTempo, Modo::Cancion, Nodo::Osito, config::TEMPO_PASO_PCT};
-    case '4':
-      return {Tipo::Eco, Modo::Cancion, Nodo::Osito, 0};
-    case '5':
-      return {Tipo::Redoble, Modo::Cancion, Nodo::Osito, 0};
-    case '6':
-      return {Tipo::Subida, Modo::Cancion, Nodo::Osito, 0};
-    case '8':
-      return {Tipo::Octava, Modo::Cancion, Nodo::Osito, 0};
-    case '0':
-      return {Tipo::Pio, Modo::Cancion, Nodo::Osito, 0};
     default:
-      return {Tipo::Ninguna, Modo::Cancion, Nodo::Osito, 0};
+      break;
+  }
+  if (modo_actual == Modo::Simon) {
+    return enSimon(tecla);
+  }
+  switch (tecla) {
+    case '*':
+      return simple(Tipo::GrabarLoop);
+    case '#':
+      return simple(Tipo::AlternarLoop);
+    case 'D':
+      return simple(Tipo::DeshacerLoop);
+    case TECLA_D_LARGA:
+      return simple(Tipo::BorrarLoop);
+    case '7':
+      return simple(Tipo::CambiarTempo, -config::TEMPO_PASO_PCT);
+    case '9':
+      return simple(Tipo::CambiarTempo, config::TEMPO_PASO_PCT);
+    case '4':
+      return simple(Tipo::Eco);
+    case '5':
+      return simple(Tipo::Redoble);
+    case '6':
+      return simple(Tipo::Subida);
+    case '8':
+      return simple(Tipo::Ritmo);
+    case '0':
+      return simple(Tipo::Acordes);
+    default:
+      return simple(Tipo::Ninguna);
   }
 }
 }  // namespace acciones_dj

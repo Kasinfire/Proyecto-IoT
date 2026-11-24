@@ -26,7 +26,7 @@ void responderModo(int32_t id, bool ok, protocolo::Modo modo, bool simulado);
 void alModo(protocolo::Modo modo, const char* cancion, contrato_mqtt::Origen origen,
             bool simulado);
 // resultado = Resultado::Nada para el pedido; luego otro con el resultado.
-void alSimon(protocolo::Nodo pedido, simon::Resultado resultado, bool simulado);
+void alSimon(protocolo::Nodo pedido, simon::Resultado resultado, uint8_t nivel, bool simulado);
 // Volumen del potenciómetro (retenido, a lo más cada VOLUMEN_CADA_MS).
 void alVolumen(uint8_t valor);
 // Pedido de orquesta/control/aviso: true una sola vez por pedido.

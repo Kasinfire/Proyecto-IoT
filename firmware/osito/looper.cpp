@@ -10,10 +10,31 @@ uint8_t paso_actual = 0;
 uint8_t pulsos_grabados = 0;
 bool esta_grabando = false;
 bool esta_sonando = false;
+// Cuántas notas había al empezar cada capa: deshacer vuelve a ese punto.
+size_t inicio_capa[config::LOOP_CAPAS_MAX] = {};
+size_t num_capas = 0;
 bool esperando_inicio = false;  // grabación nueva: arranca en el siguiente pulso
+
+void abrirCapa() {
+  if (num_capas == config::LOOP_CAPAS_MAX) {  // lleno: la más vieja ya no se puede deshacer
+    for (size_t i = 1; i < num_capas; ++i) {
+      inicio_capa[i - 1] = inicio_capa[i];
+    }
+    --num_capas;
+  }
+  inicio_capa[num_capas++] = num_notas;
+}
+
+// Una capa en la que no se tocó nada no cuenta.
+void cerrarCapa() {
+  if (num_capas > 0 && inicio_capa[num_capas - 1] == num_notas) {
+    --num_capas;
+  }
+}
 }  // namespace
 
 void reiniciar() {
+  num_capas = 0;
   num_notas = 0;
   paso_actual = 0;
   pulsos_grabados = 0;
@@ -28,6 +49,7 @@ void grabar() {
   }
   esta_grabando = true;
   pulsos_grabados = 0;
+  abrirCapa();
   if (num_notas == 0) {
     esta_sonando = false;
     esperando_inicio = true;
@@ -38,19 +60,33 @@ void grabar() {
 
 bool alternar() {
   if (num_notas == 0) {  // grabación nueva sin notas todavía: # la cancela
-    esta_grabando = false;
-    esperando_inicio = false;
+    reiniciar();
     return false;
   }
   esta_sonando = !esta_sonando;
-  if (!esta_sonando) {
+  if (!esta_sonando && esta_grabando) {
     esta_grabando = false;
+    esperando_inicio = false;
+    cerrarCapa();
   }
   return esta_sonando;
 }
 
 void borrar() {
   reiniciar();
+}
+
+bool deshacer() {
+  if (num_capas == 0) {
+    return false;
+  }
+  num_notas = inicio_capa[--num_capas];
+  esta_grabando = false;
+  esperando_inicio = false;
+  if (num_notas == 0) {
+    esta_sonando = false;
+  }
+  return true;
 }
 
 void anotar(protocolo::Nodo nodo, uint8_t nota, uint8_t velocidad, bool al_siguiente) {
@@ -80,6 +116,7 @@ size_t alPulso(Nota* salida, size_t max, bool& termino_grabacion) {
     paso_actual = (paso_actual + 1) % config::LOOP_PULSOS;
     if (esta_grabando && ++pulsos_grabados == config::LOOP_PULSOS) {
       esta_grabando = false;
+      cerrarCapa();
       esta_sonando = num_notas > 0;
       termino_grabacion = true;
     }

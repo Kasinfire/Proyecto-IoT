@@ -1,7 +1,7 @@
 // Director musical: según el modo decide qué notas mandar al Sintetizador.
 //   Canción: la base del osito suena siempre; cada parte suena mientras su animal está activo.
 //   Libre:   cada gesto toca una nota suelta de la escala pentatónica.
-//   Simón:   pide un animal/tecla (ver simon.h) y suena distinto si acierta o falla.
+//   Simón:   muestra una secuencia con luz y nota (ver simon.h); el niño la repite.
 // No usa Arduino: recibe la hora como parámetro (se prueba en la compu).
 #pragma once
 
@@ -10,6 +10,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "acompanamiento.h"
 #include "canciones.h"
 #include "interprete.h"
 #include "simon.h"
@@ -30,19 +31,21 @@ void alEvento(const interprete::Evento& evento, uint32_t ahora_ms);
 // Teclado DJ: devuelve true si el animal quedó silenciado. El osito no se puede silenciar.
 bool alternarSilencio(protocolo::Nodo nodo);
 bool silenciado(protocolo::Nodo nodo);
-// Looper (ver looper.h para el detalle). Suena en Libre y Simón.
+// Looper (ver looper.h para el detalle). Suena en Libre.
 void grabarLoop();
 bool alternarLoop();  // true si quedó sonando
+bool deshacerLoop();  // false si no había capas
 void borrarLoop();
 // Tempo en % de la canción (100 = normal), entre TEMPO_MIN_PCT y TEMPO_MAX_PCT.
 uint8_t cambiarTempo(int paso_pct);
 uint8_t tempo();
-// Efectos del DJ (ver efectos_dj.h). Eco y octava son on/off; los demás suenan una vez.
+// Efectos del DJ (ver efectos_dj.h). El eco es on/off; los demás suenan una vez.
 bool alternarEco();
-bool alternarOctava();
 void redoble(uint32_t ahora_ms);
 void subida(uint32_t ahora_ms);
-void pio();
+// Banda de fondo (ver acompanamiento.h). Callada en Simón.
+acompanamiento::Ritmo siguienteRitmo();
+bool alternarAcordes();
 // true una sola vez cuando se cierra una grabación del looper.
 bool sacarFinGrabacion(size_t& notas_en_loop);
 void avisoDesconexion();
@@ -53,5 +56,7 @@ void volumen(uint8_t valor);
 // Salidas para el resto del osito. Cada una devuelve true una sola vez.
 bool huboPulso();
 bool sacarLuz(protocolo::PayloadLuz& luz);  // Simón: qué mandar a los animales
-bool sacarResultado(simon::Resultado& resultado);
+// Simón: empezó un turno; `pedido` es el primer animal de la secuencia.
+bool sacarReto(protocolo::Nodo& pedido, uint8_t& nivel);
+bool sacarResultado(simon::Resultado& resultado, uint8_t& nivel);
 }  // namespace director

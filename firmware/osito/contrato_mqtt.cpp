@@ -150,7 +150,7 @@ bool armarEventoModo(uint32_t seq, uint32_t t, protocolo::Modo modo, const char*
 }
 
 bool armarEventoSimon(uint32_t seq, uint32_t t, Nodo pedido, simon::Resultado resultado,
-                      char* destino, size_t tamano) {
+                      uint8_t nivel, char* destino, size_t tamano) {
   // Los nombres que espera la interfaz web (nodered/README.md).
   static constexpr const char* RESULTADOS[] = {"", "acierto", "error", "tiempo"};
   const uint8_t n = protocolo::aEntero(pedido);
@@ -163,15 +163,30 @@ bool armarEventoSimon(uint32_t seq, uint32_t t, Nodo pedido, simon::Resultado re
   if (resultado == simon::Resultado::Nada) {
     return cupo(snprintf(destino, tamano,
                          "{\"seq\":%lu,\"t\":%lu,\"nodo\":\"osito\",\"tipo\":\"simon\","
-                         "\"pedido\":\"%s\"}",
-                         s, tt, protocolo::NOMBRE_NODO[n]),
+                         "\"pedido\":\"%s\",\"nivel\":%u}",
+                         s, tt, protocolo::NOMBRE_NODO[n], nivel),
                 tamano);
   }
   return cupo(snprintf(destino, tamano,
                        "{\"seq\":%lu,\"t\":%lu,\"nodo\":\"osito\",\"tipo\":\"simon\","
-                       "\"pedido\":\"%s\",\"resultado\":\"%s\"}",
-                       s, tt, protocolo::NOMBRE_NODO[n], RESULTADOS[r]),
+                       "\"pedido\":\"%s\",\"nivel\":%u,\"resultado\":\"%s\"}",
+                       s, tt, protocolo::NOMBRE_NODO[n], nivel, RESULTADOS[r]),
               tamano);
+}
+
+bool agregarArranque(char* json, size_t tamano, uint32_t arranque) {
+  const size_t largo = strlen(json);
+  if (largo < 2 || json[largo - 1] != '}') {
+    return false;
+  }
+  char campo[32];
+  const int n = snprintf(campo, sizeof(campo), ",\"arranque\":%lu}",
+                         static_cast<unsigned long>(arranque));
+  if (largo - 1 + n >= tamano) {
+    return false;
+  }
+  strcpy(json + largo - 1, campo);
+  return true;
 }
 
 bool armarVolumen(uint8_t valor, char* destino, size_t tamano) {

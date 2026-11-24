@@ -10,6 +10,7 @@
 #include "director.h"
 #include "estado_animales.h"
 #include "filtro_boton.h"
+#include "pulsacion_larga.h"
 #include "interprete.h"
 
 namespace {
@@ -385,6 +386,42 @@ void pruebasLibre() {
   revisar("libre: los 100 niveles de sombra caen en la pentatonica", todas_en_escala);
 }
 
+// Deja correr el juego hasta que el niño deba responder (o se acabe el plazo).
+void esperarTurno(uint32_t& t, int vivo, int& luces) {
+  luces = 0;
+  const uint32_t limite = t + 15000;
+  bool reto = false;
+  uint32_t ultima = t;
+  protocolo::PayloadLuz luz;
+  while (t < limite) {
+    correr(t, t + 1, vivo);
+    if (director::sacarLuz(luz)) {
+      reto = true;
+      ++luces;
+      ultima = t;
+    }
+    if (reto && t - ultima > static_cast<uint32_t>(luz.duracion_ms) +
+                              config::SIMON_HUECO_MS + 50) {
+      return;
+    }
+  }
+}
+
+// El gatito toca la secuencia completa (o se equivoca en el último paso).
+void responderGatito(uint32_t& t, int vivo, bool bien) {
+  const size_t largo = simon::largo();
+  for (size_t i = 0; i < largo; ++i) {
+    uint8_t tecla = simon::pasoDe(i).led;
+    if (!bien && i + 1 == largo) {
+      tecla = (tecla + 1) % protocolo::NUM_NOTAS;
+    }
+    director::alEvento(gesto(Nodo::Gatito, interprete::Clase::Nota, tecla, 90), t);
+    correr(t, t + 100, vivo);
+    director::alEvento(gesto(Nodo::Gatito, interprete::Clase::Nota, tecla, 0), t);
+    correr(t, t + 100, vivo);
+  }
+}
+
 void pruebasSimon() {
   using interprete::Clase;
   estado_animales::reiniciar();
@@ -394,36 +431,163 @@ void pruebasSimon() {
   director::cambiarModo(protocolo::Modo::Simon, t);
   protocolo::PayloadLuz luz;
   simon::Resultado resultado;
+  uint8_t nivel = 0;
+  Nodo pedido = Nodo::Osito;
+  int luces = 0;
 
   correr(t, 5000);
   revisar("simon: sin animales conectados no pide nada", !director::sacarLuz(luz));
 
   // SIMULACIÓN: solo el gatito está conectado.
   const int vivo = protocolo::aEntero(Nodo::Gatito);
+  s.limpiar();
   correr(t, 5100, vivo);
-  bool pidio = director::sacarLuz(luz);
   revisar("simon: pide una tecla del gatito",
-          pidio && luz.nodo_destino == protocolo::aEntero(Nodo::Gatito) &&
+          director::sacarLuz(luz) && luz.nodo_destino == protocolo::aEntero(Nodo::Gatito) &&
               luz.led < protocolo::NUM_NOTAS);
+  revisar("simon: la nota suena junto con la luz", s.on[C_GATITO] == 1);
+  const uint8_t nota_pista = s.ultima_on[C_GATITO];
+  revisar("simon: avisa que empezo un reto de nivel 1",
+          director::sacarReto(pedido, nivel) && pedido == Nodo::Gatito && nivel == 1);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, (luz.led + 1) % 7, 90), t);
+  revisar("simon: tocar mientras se muestra no cuenta", !director::sacarResultado(resultado, nivel));
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, (luz.led + 1) % 7, 0), t);
+  correr(t, t + config::SIMON_LUZ_MS + config::SIMON_HUECO_MS + 10, vivo);
+  revisar("simon: la nota de la pista se suelta", s.off[C_GATITO] >= 2);
 
+  s.limpiar();
   director::alEvento(gesto(Nodo::Gatito, Clase::Nota, luz.led, 90), t);
-  revisar("simon: tecla correcta -> acierto",
-          director::sacarResultado(resultado) && resultado == simon::Resultado::Acierto);
+  revisar("simon: tecla correcta -> acierto", director::sacarResultado(resultado, nivel) &&
+                                                  resultado == simon::Resultado::Acierto &&
+                                                  nivel == 1);
+  revisar("simon: suena la misma nota que la pista", s.ultima_on[C_GATITO] == nota_pista);
+  correr(t, t + 300, vivo);
+  revisar("simon: el tono espera a que se oiga lo que se toco", s.on[C_OSITO] == 0);
+  correr(t, t + 600, vivo);
+  revisar("simon: al acertar suena un arpegio", s.on[C_OSITO] == 4 && s.ultima_on[C_OSITO] == 84);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, luz.led, 0), t);
 
-  correr(t, t + 1600, vivo);
-  pidio = director::sacarLuz(luz);
-  const uint8_t otra = (luz.led + 1) % protocolo::NUM_NOTAS;
-  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, otra, 90), t);
-  revisar("simon: tecla equivocada -> error",
-          pidio && director::sacarResultado(resultado) && resultado == simon::Resultado::Error);
+  const simon::Paso primero = simon::pasoDe(0);
+  esperarTurno(t, vivo, luces);
+  revisar("simon: nivel 2 muestra 2 pasos", simon::nivel() == 2 && luces == 2);
+  revisar("simon: conserva el primero y agrega otro distinto",
+          simon::pasoDe(0).led == primero.led && simon::pasoDe(1).led != primero.led);
+  director::sacarReto(pedido, nivel);
 
-  correr(t, t + 1600, vivo);
-  pidio = director::sacarLuz(luz);
-  correr(t, t + 5100, vivo);
-  revisar("simon: sin respuesta en 5 s -> tiempo agotado",
-          pidio && director::sacarResultado(resultado) &&
-              resultado == simon::Resultado::TiempoAgotado);
+  const uint8_t segundo = simon::pasoDe(1).led;
+  responderGatito(t, vivo, false);
+  revisar("simon: fallar el segundo paso -> error",
+          director::sacarResultado(resultado, nivel) && resultado == simon::Resultado::Error);
+  esperarTurno(t, vivo, luces);
+  revisar("simon: al primer fallo repite el mismo reto",
+          simon::nivel() == 2 && simon::pasoDe(1).led == segundo && luces == 2);
+  correr(t, t + config::SIMON_ESPERA_MS + 100, vivo);
+  revisar("simon: sin respuesta -> tiempo agotado",
+          director::sacarResultado(resultado, nivel) &&
+              resultado == simon::Resultado::TiempoAgotado && nivel == 2);
+  revisar("simon: al segundo fallo seguido baja un nivel", simon::nivel() == 1);
   revisar("simon: cuenta 1 acierto y 2 errores", simon::aciertos() == 1 && simon::errores() == 2);
+
+  uint16_t luz_fin = 0;
+  bool crecio = true;
+  for (uint8_t n = 1; n <= config::SIMON_NIVEL_MAX; ++n) {
+    esperarTurno(t, vivo, luces);
+    crecio = crecio && simon::nivel() == n && luces == n && simon::largo() == n;
+    responderGatito(t, vivo, true);
+    director::sacarResultado(resultado, nivel);
+    crecio = crecio && resultado == simon::Resultado::Acierto;
+  }
+  revisar("simon: la secuencia crece de 1 a 6", crecio);
+  while (!director::sacarLuz(luz)) {
+    correr(t, t + 1, vivo);
+  }
+  luz_fin = luz.duracion_ms;
+  revisar("simon: en el ultimo nivel sigue en 6 y la luz es mas corta",
+          simon::nivel() == config::SIMON_NIVEL_MAX && luz_fin == config::SIMON_LUZ_MIN_MS);
+
+  // Controles del terapeuta.
+  simon::cambiarNivel(-10, t);
+  revisar("simon: cambiar nivel no se sale de 1..6", simon::nivel() == config::SIMON_NIVEL_MAX);
+  revisar("simon: bajar nivel a mano", simon::cambiarNivel(-4, t) == 2);
+  esperarTurno(t, vivo, luces);
+  revisar("simon: y muestra esa cantidad de pasos", luces == 2);
+  revisar("simon: pista en el turno del nino", simon::pista());
+  correr(t, t + 5, vivo);
+  revisar("simon: la pista prende solo el paso que toca",
+          director::sacarLuz(luz) && luz.led == simon::pasoDe(0).led);
+  while (director::sacarReto(pedido, nivel)) {
+  }
+  simon::repetir(t);
+  esperarTurno(t, vivo, luces);
+  revisar("simon: repetir muestra todo sin contar otro turno",
+          luces == 2 && !director::sacarReto(pedido, nivel));
+  director::alternarSilencio(Nodo::Gatito);
+  correr(t, t + 4000, vivo);
+  director::sacarLuz(luz);
+  correr(t, t + 4000, vivo);
+  revisar("simon: a un animal silenciado no se le pide, y no es error",
+          !director::sacarLuz(luz) && !director::sacarResultado(resultado, nivel));
+  director::alternarSilencio(Nodo::Gatito);
+  esperarTurno(t, vivo, luces);
+  revisar("simon: al devolverlo sigue el juego", luces == 2);
+  correr(t, t + 8000);  // sin latidos: se desconecta
+  revisar("simon: si el animal se desconecta, no cuenta como error",
+          simon::errores() <= 3 && !estado_animales::estaConectado(Nodo::Gatito, t));
+}
+
+// Gestos que vienen de antes no deben responder el turno siguiente.
+void pruebasSimonGestos() {
+  using interprete::Clase;
+  simon::Resultado resultado;
+  uint8_t nivel = 0;
+  int luces = 0;
+  {
+    estado_animales::reiniciar();
+    SintetizadorFalso s;
+    uint32_t t = 1000;
+    director::iniciar(s, 5, t);
+    director::cambiarModo(protocolo::Modo::Simon, t);
+    const int vivo = protocolo::aEntero(Nodo::Ranita);
+    // La ranita queda tapada desde antes y repite su nivel cada 500 ms.
+    bool conto = false;
+    for (int i = 0; i < 12; ++i) {
+      director::alEvento(gesto(Nodo::Ranita, Clase::Sombra, 60), t);
+      correr(t, t + 500, vivo);
+      conto = conto || director::sacarResultado(resultado, nivel);
+    }
+    revisar("simon: ranita que ya estaba tapada no responde", !conto);
+    simon::repetir(t);
+    director::alEvento(gesto(Nodo::Ranita, Clase::Sombra, 0), t);
+    esperarTurno(t, vivo, luces);
+    s.limpiar();
+    director::alEvento(gesto(Nodo::Ranita, Clase::Sombra, 20), t);
+    revisar("simon: destaparla y volver a taparla si cuenta",
+            director::sacarResultado(resultado, nivel) && resultado == simon::Resultado::Acierto);
+    revisar("simon: la ranita suena igual que su pista",
+            s.ultima_on[C_RANITA] == config::SIMON_NOTA_RANITA);
+  }
+  {
+    estado_animales::reiniciar();
+    SintetizadorFalso s;
+    uint32_t t = 1000;
+    director::iniciar(s, 5, t);
+    director::cambiarModo(protocolo::Modo::Simon, t);
+    const int vivo = protocolo::aEntero(Nodo::Pollito);
+    esperarTurno(t, vivo, luces);
+    director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+    revisar("simon: agitar el pollito -> acierto", director::sacarResultado(resultado, nivel) &&
+                                                       resultado == simon::Resultado::Acierto);
+    // Nivel 2: dos sacudidas separadas; el rebote a los 350 ms no es la segunda.
+    esperarTurno(t, vivo, luces);
+    director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+    correr(t, t + 350, vivo);
+    director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+    revisar("simon: el rebote del pollito no cuenta", !director::sacarResultado(resultado, nivel));
+    correr(t, t + 900, vivo);
+    director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+    revisar("simon: una sacudida nueva si cuenta", director::sacarResultado(resultado, nivel) &&
+                                                       resultado == simon::Resultado::Acierto);
+  }
 }
 
 void pruebasArranque() {
@@ -450,27 +614,54 @@ void pruebasModos() {
 void pruebasDj() {
   using acciones_dj::Tipo;
   using interprete::Clase;
-  revisar("dj: A -> cancion", acciones_dj::deTecla('A').tipo == Tipo::CambiarModo &&
-                                  acciones_dj::deTecla('A').modo == protocolo::Modo::Cancion);
-  revisar("dj: B -> libre", acciones_dj::deTecla('B').modo == protocolo::Modo::Libre);
-  revisar("dj: C -> simon", acciones_dj::deTecla('C').modo == protocolo::Modo::Simon);
+  revisar("dj: A -> cancion", acciones_dj::deTecla('A', protocolo::Modo::Libre).tipo == Tipo::CambiarModo &&
+                                  acciones_dj::deTecla('A', protocolo::Modo::Libre).modo == protocolo::Modo::Cancion);
+  revisar("dj: B -> libre", acciones_dj::deTecla('B', protocolo::Modo::Libre).modo == protocolo::Modo::Libre);
+  revisar("dj: C -> simon", acciones_dj::deTecla('C', protocolo::Modo::Libre).modo == protocolo::Modo::Simon);
   revisar("dj: 1/2/3 -> ranita/gatito/pollito",
-          acciones_dj::deTecla('1').nodo == Nodo::Ranita &&
-              acciones_dj::deTecla('2').nodo == Nodo::Gatito &&
-              acciones_dj::deTecla('3').tipo == Tipo::AlternarSilencio &&
-              acciones_dj::deTecla('3').nodo == Nodo::Pollito);
-  revisar("dj: * graba, # play/stop, D borra",
-          acciones_dj::deTecla('*').tipo == Tipo::GrabarLoop &&
-              acciones_dj::deTecla('#').tipo == Tipo::AlternarLoop &&
-              acciones_dj::deTecla('D').tipo == Tipo::BorrarLoop);
-  revisar("dj: 7 baja y 9 sube el tempo", acciones_dj::deTecla('7').tempo_pct < 0 &&
-                                              acciones_dj::deTecla('9').tempo_pct > 0);
-  revisar("dj: 4 eco, 5 redoble, 6 subida, 8 octava, 0 pio",
-          acciones_dj::deTecla('4').tipo == Tipo::Eco &&
-              acciones_dj::deTecla('5').tipo == Tipo::Redoble &&
-              acciones_dj::deTecla('6').tipo == Tipo::Subida &&
-              acciones_dj::deTecla('8').tipo == Tipo::Octava &&
-              acciones_dj::deTecla('0').tipo == Tipo::Pio);
+          acciones_dj::deTecla('1', protocolo::Modo::Libre).nodo == Nodo::Ranita &&
+              acciones_dj::deTecla('2', protocolo::Modo::Libre).nodo == Nodo::Gatito &&
+              acciones_dj::deTecla('3', protocolo::Modo::Libre).tipo == Tipo::AlternarSilencio &&
+              acciones_dj::deTecla('3', protocolo::Modo::Libre).nodo == Nodo::Pollito);
+  revisar("dj: * graba, # play/stop, D deshace, D mantenida borra",
+          acciones_dj::deTecla('*', protocolo::Modo::Libre).tipo == Tipo::GrabarLoop &&
+              acciones_dj::deTecla('#', protocolo::Modo::Libre).tipo == Tipo::AlternarLoop &&
+              acciones_dj::deTecla('D', protocolo::Modo::Libre).tipo == Tipo::DeshacerLoop &&
+              acciones_dj::deTecla(acciones_dj::TECLA_D_LARGA, protocolo::Modo::Libre).tipo ==
+                  Tipo::BorrarLoop);
+  const auto simon_ = protocolo::Modo::Simon;
+  revisar("dj: en Simon 7/9 nivel, * empezar, # repetir, 0 pista",
+          acciones_dj::deTecla('7', simon_).tipo == Tipo::SimonNivel &&
+              acciones_dj::deTecla('7', simon_).cuanto == -1 &&
+              acciones_dj::deTecla('9', simon_).cuanto == 1 &&
+              acciones_dj::deTecla('*', simon_).tipo == Tipo::SimonEmpezar &&
+              acciones_dj::deTecla('#', simon_).tipo == Tipo::SimonRepetir &&
+              acciones_dj::deTecla('0', simon_).tipo == Tipo::SimonPista);
+  revisar("dj: en Simon 4 5 6 8 D no hacen nada y 1 A B si",
+          acciones_dj::deTecla('4', simon_).tipo == Tipo::Ninguna &&
+              acciones_dj::deTecla('8', simon_).tipo == Tipo::Ninguna &&
+              acciones_dj::deTecla('D', simon_).tipo == Tipo::Ninguna &&
+              acciones_dj::deTecla('1', simon_).tipo == Tipo::AlternarSilencio &&
+              acciones_dj::deTecla('B', simon_).tipo == Tipo::CambiarModo);
+  PulsacionLarga d(1000);
+  d.iniciar(false);
+  bool nada = d.actualizar(true, 0) == PulsacionLarga::Tipo::Nada &&
+              d.actualizar(true, 500) == PulsacionLarga::Tipo::Nada;
+  revisar("dj: D soltada antes de 1 s = corta",
+          nada && d.actualizar(false, 600) == PulsacionLarga::Tipo::Corta);
+  d.actualizar(true, 2000);
+  revisar("dj: D a 1 s = larga, y al soltar no cuenta otra vez",
+          d.actualizar(true, 3000) == PulsacionLarga::Tipo::Larga &&
+              d.actualizar(true, 4000) == PulsacionLarga::Tipo::Nada &&
+              d.actualizar(false, 4100) == PulsacionLarga::Tipo::Nada);
+  revisar("dj: 7 baja y 9 sube el tempo", acciones_dj::deTecla('7', protocolo::Modo::Libre).cuanto < 0 &&
+                                              acciones_dj::deTecla('9', protocolo::Modo::Libre).cuanto > 0);
+  revisar("dj: 4 eco, 5 redoble, 6 subida, 8 ritmo, 0 acordes",
+          acciones_dj::deTecla('4', protocolo::Modo::Libre).tipo == Tipo::Eco &&
+              acciones_dj::deTecla('5', protocolo::Modo::Libre).tipo == Tipo::Redoble &&
+              acciones_dj::deTecla('6', protocolo::Modo::Libre).tipo == Tipo::Subida &&
+              acciones_dj::deTecla('8', protocolo::Modo::Libre).tipo == Tipo::Ritmo &&
+              acciones_dj::deTecla('0', protocolo::Modo::Libre).tipo == Tipo::Acordes);
 
   estado_animales::reiniciar();
   SintetizadorFalso s;
@@ -590,16 +781,6 @@ void pruebasEfectos() {
   s.limpiar();
   const uint32_t pulso = 250;
 
-  revisar("efectos: octava arriba", director::alternarOctava());
-  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 90), t);  // mi = 64
-  revisar("efectos: con octava el mi suena 76", s.ultima_on[C_GATITO] == 76);
-  director::alternarOctava();
-  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 0), t);
-  revisar("efectos: se suelta el 76 aunque ya se quito la octava",
-          s.ultima_off[C_GATITO] == 76);
-  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
-  revisar("efectos: la percusion no cambia de octava", s.ultima_on[C_POLLITO] == 70);
-
   s.limpiar();
   revisar("efectos: eco encendido", director::alternarEco());
   director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 0, 100), t);
@@ -624,16 +805,92 @@ void pruebasEfectos() {
   revisar("efectos: termina con la caida (do grave)", s.ultima_on[15] == 36);
   revisar("efectos: y platillo", s.ultima_on[16] == 49);
 
-  s.limpiar();
-  director::pio();
-  revisar("efectos: 0 toca el pio en el canal del DJ", s.ultima_on[16] == 90);
-
   // En Canción los efectos también suenan: van en canales que el fade no toca.
   director::cambiarModo(protocolo::Modo::Cancion, t);
   s.limpiar();
   director::redoble(t);
   correr(t, t + pulso * 4 + 20);
   revisar("efectos: el redoble suena tambien en Cancion", s.on[16] >= 8);
+}
+
+void pruebasDeshacer() {
+  using interprete::Clase;
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t);
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  const uint32_t vuelta = 250 * 16;
+  revisar("deshacer: sin loop no hay nada que quitar", !director::deshacerLoop());
+  director::grabarLoop();
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 90), t);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 0), t);
+  correr(t, t + vuelta + 300);
+  director::grabarLoop();
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+  correr(t, t + vuelta + 10);
+  director::grabarLoop();  // una capa en la que no se toca nada
+  correr(t, t + vuelta + 10);
+  revisar("deshacer: quita la ultima capa con notas", director::deshacerLoop());
+  s.limpiar();
+  correr(t, t + vuelta);
+  revisar("deshacer: queda la primera capa", s.on[C_GATITO] == 1 && s.on[C_POLLITO] == 0);
+  director::cambiarModo(protocolo::Modo::Simon, t);
+  s.limpiar();
+  correr(t, t + vuelta);
+  revisar("deshacer: en Simon el loop calla", s.on[C_GATITO] == 0);
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  s.limpiar();
+  correr(t, t + vuelta + 10);
+  revisar("deshacer: al volver a Libre sigue", s.on[C_GATITO] == 1);
+  revisar("deshacer: quita la primera", director::deshacerLoop() && !director::alternarLoop());
+}
+
+void pruebasBanda() {
+  using acompanamiento::Ritmo;
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t);
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  s.limpiar();
+  correr(t, t + 3 * 250 + 10);  // tres pulsos dentro del compás
+  revisar("banda: 8 pide el primer ritmo", director::siguienteRitmo() == Ritmo::Tranquilo);
+  revisar("banda: 0 pide acordes", director::alternarAcordes());
+  correr(t, t + 4 * 250);
+  revisar("banda: espera al siguiente compas", s.on[16] == 0 && s.on[14] == 0);
+  correr(t, t + 2 * 250);
+  revisar("banda: entra al compas con bombo y acorde de do", s.on[16] >= 1 && s.on[14] == 3);
+  correr(t, t + 8 * 250);
+  revisar("banda: el acorde cambia y se suelta el anterior",
+          s.on[14] == 6 && s.off[14] == 3 && s.ultima_on[14] == 64);
+  int distintos = 0;
+  for (int i = 0; i < 3; ++i) {
+    director::siguienteRitmo();
+    correr(t, t + 8 * 250);  // que entre en el compás
+    s.limpiar();
+    correr(t, t + 16 * 250);
+    distintos = distintos * 100 + s.on[16];
+  }
+  revisar("banda: pop y cumbia suenan distinto, y luego se apaga",
+          distintos / 10000 > 0 && distintos / 100 % 100 > 0 &&
+              distintos / 10000 != distintos / 100 % 100 && s.on[16] == 0);
+  director::siguienteRitmo();
+  correr(t, t + 8 * 250);
+  director::alternarEco();
+  director::cambiarModo(protocolo::Modo::Simon, t);
+  revisar("banda: al entrar a Simon suelta el acorde", s.off[14] >= 3);
+  s.limpiar();
+  correr(t, t + 16 * 250);
+  revisar("banda: callada en Simon", s.on[16] == 0 && s.on[14] == 0);
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  s.limpiar();
+  correr(t, t + 16 * 250);
+  revisar("banda: al volver a Libre sigue", s.on[16] > 0 && s.on[14] > 0);
+  director::cambiarTempo(100);
+  s.limpiar();
+  correr(t, t + 16 * 250);
+  revisar("banda: sigue el tempo (200 % = el doble de acordes)", s.on[14] == 12);
 }
 
 void pruebasTempo() {
@@ -703,17 +960,30 @@ void pruebasContratoMqtt() {
               strcmp(buf, "{\"seq\":9,\"t\":0,\"nodo\":\"osito\",\"tipo\":\"modo\","
                           "\"modo\":\"libre\",\"cancion\":\"prueba\",\"origen\":\"teclado\"}") == 0);
   revisar("mqtt: simon pedido",
-          contrato_mqtt::armarEventoSimon(10, 0, Nodo::Ranita, simon::Resultado::Nada, buf,
+          contrato_mqtt::armarEventoSimon(10, 0, Nodo::Ranita, simon::Resultado::Nada, 2, buf,
                                           sizeof(buf)) &&
-              strstr(buf, "\"pedido\":\"ranita\"}") != nullptr);
+              strstr(buf, "\"pedido\":\"ranita\",\"nivel\":2}") != nullptr);
   revisar("mqtt: simon tiempo agotado se llama \"tiempo\"",
-          contrato_mqtt::armarEventoSimon(11, 0, Nodo::Pollito, simon::Resultado::TiempoAgotado,
+          contrato_mqtt::armarEventoSimon(11, 0, Nodo::Pollito, simon::Resultado::TiempoAgotado, 3,
                                           buf, sizeof(buf)) &&
-              strstr(buf, "\"pedido\":\"pollito\",\"resultado\":\"tiempo\"}") != nullptr);
+              strstr(buf, "\"pedido\":\"pollito\",\"nivel\":3,\"resultado\":\"tiempo\"}") != nullptr);
   revisar("mqtt: volumen", contrato_mqtt::armarVolumen(70, buf, sizeof(buf)) &&
                                strcmp(buf, "{\"valor\":70}") == 0);
   revisar("mqtt: estado de la cola", contrato_mqtt::armarCola(37, 2, buf, sizeof(buf)) &&
                                          strcmp(buf, "{\"pendientes\":37,\"descartados\":2}") == 0);
+  strcpy(buf, "{\"seq\":1}");
+  revisar("mqtt: agrega el arranque al final",
+          contrato_mqtt::agregarArranque(buf, sizeof(buf), 42) &&
+              strcmp(buf, "{\"seq\":1,\"arranque\":42}") == 0);
+  char justo[12] = "{\"seq\":1}";
+  revisar("mqtt: si no cabe el arranque avisa y no escribe de mas",
+          !contrato_mqtt::agregarArranque(justo, sizeof(justo), 42) &&
+              strcmp(justo, "{\"seq\":1}") == 0);
+  revisar("mqtt: el evento mas largo cabe con arranque",
+          contrato_mqtt::armarEventoModo(4294967295u, 4294967295u, protocolo::Modo::Cancion,
+                                         "xxxxxxxxxxxxxxxxxxxxxxx", contrato_mqtt::Origen::NodeRed,
+                                         buf, sizeof(buf)) &&
+              contrato_mqtt::agregarArranque(buf, sizeof(buf), 999999));
   bool silenciar = false;
   revisar("mqtt: aviso silenciar true",
           contrato_mqtt::leerAviso("{\"silenciar\": true}", silenciar) && silenciar);
@@ -773,12 +1043,15 @@ int main() {
   pruebasCancion();
   pruebasLibre();
   pruebasSimon();
+  pruebasSimonGestos();
   pruebasModos();
   pruebasDj();
   pruebasLooper();
   pruebasLooperCancelar();
   pruebasTempo();
   pruebasEfectos();
+  pruebasDeshacer();
+  pruebasBanda();
   pruebasContratoMqtt();
   pruebasColaEventos();
   printf("[SIMULACIÓN] %d de %d pruebas pasaron\n", pruebas - fallos, pruebas);
