@@ -38,12 +38,11 @@ const HISTORIAL_A07 = {
     { fecha: '2026-11-02', modos: ['cancion', 'libre'], minutos: 14, cancion: 'Estrellita', gestos: 212, simon: [4, 10], aviso: null },
   ],
   reparto: { gatito: 742, ranita: 510, pollito: 288 },
-  nota: { texto: 'Evita al pollito; le cuesta sacudirlo. Probar sentado y con más tiempo.', fecha: '2026-11-20' },
 };
 
 export function historialDe(alias) {
   if (alias === 'A-07') return HISTORIAL_A07;
-  return { sesiones: [], reparto: {}, nota: null };
+  return { sesiones: [], reparto: {} };
 }
 
 export function sesionActual() {

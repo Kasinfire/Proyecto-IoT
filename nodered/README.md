@@ -42,4 +42,4 @@ Un mensaje JSON por evento, ya descifrado:
 | `GET /api/canciones` | — | `[{"nombre":"Estrellita","tipo":"tranquilas","duracion":"1:20"}]` | `tipo`: `tranquilas`, `alegres`, `navidad` o `cumpleanos` |
 | `GET /api/ninos` | — | `[{"alias":"A-07","sesiones":6,"simon_pct":75,"favorito":"gatito","en_sesion":true}]` | |
 | `POST /api/ninos` | `{"alias":"D-04"}` | `204` | Solo alias, nunca nombres |
-| `GET /api/historial?alias=A-07&periodo=mes` | — | `{"sesiones":[{"fecha":"2026-11-20","modos":["cancion","simon"],"minutos":18,"cancion":"Estrellita","gestos":299,"simon":[9,12],"aviso":"Pollito se desconectó"}],"reparto":{"gatito":742,"ranita":510,"pollito":288},"nota":{"texto":"…","fecha":"2026-11-20"}}` | Consulta Supabase; `periodo`: `mes`, `trimestre` o `todo` |
+| `GET /api/historial?alias=A-07&periodo=mes` | — | `{"sesiones":[{"fecha":"2026-11-20","modos":["cancion","simon"],"minutos":18,"cancion":"Estrellita","gestos":299,"simon":[9,12],"aviso":"Pollito se desconectó"}],"reparto":{"gatito":742,"ranita":510,"pollito":288}}` | Consulta Supabase; `periodo`: `mes`, `trimestre` o `todo` |

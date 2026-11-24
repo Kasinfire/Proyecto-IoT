@@ -56,18 +56,11 @@ function pintarReparto(reparto) {
   }
   const maximo = filas[0][1];
   $('reparto').replaceChildren(...filas.map(([id, valor]) => el('div', { class: 'reparto' },
-    cuadroCara(id, 36, 26),
+    cuadroCara(id, 44, 32),
     el('span', { class: 'reparto__nombre' }, datosAnimal(id).nombre),
     el('div', { class: 'reparto__pista', 'aria-hidden': 'true' },
       el('div', { class: 'reparto__barra', style: { width: `${(valor / maximo) * 100}%`, background: `var(--${id}-fuerte)` } })),
     el('span', { class: 'reparto__valor' }, String(valor)))));
-}
-
-function pintarNota(nota) {
-  $('seccion-nota').hidden = !nota;
-  if (!nota) return;
-  const { dia, mes } = fechaCorta(nota.fecha);
-  $('nota').replaceChildren(`“${nota.texto}”`, el('footer', {}, `${dia} ${mes}`));
 }
 
 async function cargarHistorial() {
@@ -77,7 +70,6 @@ async function cargarHistorial() {
     pintarSesiones(datos.sesiones, alias);
     pintarAvance(datos.sesiones);
     pintarReparto(datos.reparto);
-    pintarNota(datos.nota);
   } catch (error) {
     console.error('[historial] No se pudo cargar:', error);
     $('lista-sesiones').replaceChildren(el('p', { class: 'vacio' }, 'No se pudo cargar el historial. Revisa que Node-RED y el internet estén funcionando.'));

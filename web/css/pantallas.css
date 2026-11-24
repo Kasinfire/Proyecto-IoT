@@ -278,21 +278,32 @@
 }
 
 .historial {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(380px, 1fr);
   gap: 24px;
-  align-items: flex-start;
+  align-items: stretch;
+}
+
+@media (max-width: 1100px) {
+  .historial { grid-template-columns: minmax(0, 1fr); }
 }
 
 .sesiones {
-  flex: 999 1 720px;
   min-width: 0;
-  padding: 18px;
-  border-radius: var(--radio-grande);
-  background: var(--lila);
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* Mismo gris que las tarjetas de la derecha: la lista no compite con la gráfica */
+.sesiones__lista {
+  flex: 1;
+  padding: 8px;
+  border-radius: var(--radio-grande);
+  background: var(--superficie);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .sesiones__cabeza {
@@ -301,13 +312,13 @@
   align-items: baseline;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 0 4px;
-  color: #3d3a52;
 }
 
 .sesion {
-  display: flex;
-  flex-wrap: wrap;
+  flex: 1 1 auto;
+  max-height: 104px;
+  display: grid;
+  grid-template-columns: 56px minmax(160px, 1.5fr) minmax(70px, 0.6fr) minmax(80px, 0.6fr) minmax(130px, 1fr);
   align-items: center;
   gap: 18px;
   padding: 12px 14px;
@@ -320,7 +331,7 @@
   height: 56px;
   flex: none;
   border-radius: 16px;
-  background: #f6f4ff;
+  background: var(--superficie);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -332,15 +343,13 @@
 .sesion__mes { font-size: 11px; font-weight: 700; color: var(--tinta-suave); }
 
 .sesion__que {
-  flex: 1 1 200px;
   min-width: 0;
 }
 
 .sesion__modos { font-size: 15px; font-weight: 800; }
 
 .sesion__dato {
-  width: 104px;
-  flex: none;
+  min-width: 0;
 }
 
 .sesion__dato small {
@@ -353,8 +362,8 @@
 .sesion__dato strong { font-size: 18px; font-weight: 800; }
 
 .sesion__aviso {
-  width: 170px;
-  flex: none;
+  justify-self: end;
+  text-align: right;
   font-size: 12px;
   font-weight: 700;
   color: var(--tinta-suave);
@@ -371,7 +380,6 @@
 }
 
 .historial__lado {
-  flex: 1 1 340px;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -379,14 +387,18 @@
 }
 
 .avance {
-  padding: 16px;
-  border-radius: 20px;
+  height: 320px;
+  padding: 20px;
+  border-radius: var(--radio-grande);
   background: var(--bien-fondo);
+  display: flex;
+  flex-direction: column;
 }
 
 .avance__barras {
-  height: 120px;
-  margin-top: 12px;
+  flex: 1;
+  min-height: 140px;
+  margin-top: 16px;
   display: flex;
   align-items: flex-end;
   gap: 8px;
@@ -399,8 +411,8 @@
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
+  gap: 6px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -421,47 +433,41 @@
 .avance__fechas span {
   flex: 1;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #1f4a2e;
+}
+
+.reparto-caja {
+  padding: 8px;
+  border-radius: var(--radio-grande);
+  background: var(--superficie);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .reparto {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 16px;
-  background: var(--superficie);
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radio);
+  background: #ffffff;
 }
 
-.reparto__nombre { width: 64px; flex: none; font-weight: 800; }
+.reparto__nombre { width: 72px; flex: none; font-size: 15px; font-weight: 800; }
 
 .reparto__pista {
   flex: 1;
-  height: 12px;
+  height: 14px;
   border-radius: 999px;
   background: #e6e6df;
   overflow: hidden;
 }
 
 .reparto__barra { height: 100%; border-radius: 999px; }
-.reparto__valor { width: 40px; flex: none; text-align: right; font-weight: 800; }
-
-.nota-terapeuta {
-  margin: 0;
-  padding: 16px;
-  border-radius: 20px;
-  background: var(--aviso-fondo);
-  font-weight: 500;
-}
-
-.nota-terapeuta footer {
-  margin-top: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  color: #4a3600;
-}
+.reparto__valor { width: 44px; flex: none; text-align: right; font-size: 16px; font-weight: 800; }
 
 /* ================= Canciones ================= */
 
