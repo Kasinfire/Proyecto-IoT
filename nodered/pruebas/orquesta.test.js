@@ -108,12 +108,12 @@ test('modo: responde id, espera acuse y avisa a las pantallas', () => {
   const { o } = nueva();
   assert.strictEqual(o.alHttp('POST', 'modo', { modo: 'libre' }).codigo, 503);
   o.alMqtt('orquesta/osito/estado', '{"estado":"online"}');
-  const r = o.alHttp('POST', 'modo', { modo: 'libre', cancion: 'prueba' });
-  assert.deepStrictEqual(JSON.parse(r.mqtt[0].payload), { id: r.cuerpo.id, modo: 'libre', cancion: 'prueba' });
+  const r = o.alHttp('POST', 'modo', { modo: 'libre', cancion: 'Noche de paz' });
+  assert.deepStrictEqual(JSON.parse(r.mqtt[0].payload), { id: r.cuerpo.id, modo: 'libre', cancion: 'noche-de-paz' });
   const a = o.alMqtt('orquesta/control/modo/ack', JSON.stringify({ id: r.cuerpo.id, ok: true, modo: 'libre' }));
-  assert.deepStrictEqual(a.ws, [{ tipo: 'modo', id: r.cuerpo.id, ok: true, modo: 'libre', cancion: 'prueba' }]);
+  assert.deepStrictEqual(a.ws, [{ tipo: 'modo', id: r.cuerpo.id, ok: true, modo: 'libre', cancion: 'Noche de paz' }]);
   assert.strictEqual(o.alHttp('POST', 'modo', { modo: 'x' }).codigo, 400);
-  assert.strictEqual(o.alHttp('POST', 'modo', { modo: 'cancion', cancion: 'Noche de paz' }).codigo, 400);
+  assert.strictEqual(o.alHttp('POST', 'modo', { modo: 'cancion', cancion: 'No existe' }).codigo, 400);
 });
 
 test('modo con el botón llega sin id; el de Node-RED no se repite', () => {
@@ -208,4 +208,115 @@ test('sesión completa: gestos, Simón, historial y ficha', () => {
   reloj.t += 40 * 86400000;
   assert.strictEqual(o.alHttp('GET', 'historial', { alias: 'B-12', periodo: 'mes' }).cuerpo.sesiones.length, 0);
   assert.strictEqual(o.alHttp('GET', 'historial', { alias: 'B-12', periodo: 'todo' }).cuerpo.sesiones.length, 1);
+});
+
+const enLinea = (o) => {
+  for (const n of ['osito', 'gatito']) o.alMqtt(`orquesta/${n}/estado`, '{"estado":"online"}');
+};
+const MIA = { nombre: 'Mi canción', tipo: 'alegres', estilo: 'marcha', compas: 8, pulso_ms: 250, melodia: Array(40).fill([60, 2]) };
+
+test('canción propia: se manda por trozos y el modo va después del acuse', () => {
+  const { o } = nueva();
+  enLinea(o);
+  const { id } = o.alHttp('POST', 'canciones', MIA).cuerpo;
+  assert.match(id, /^m-[0-9a-f]{10}$/);
+  const r = o.alHttp('POST', 'modo', { modo: 'cancion', cancion: 'mi CANCIÓN' });
+  const msgs = r.mqtt.map((m) => JSON.parse(m.payload));
+  assert.ok(r.mqtt.every((m) => m.topic === 'orquesta/control/cancion' && m.payload.length < 256));
+  assert.deepStrictEqual(msgs[0], { carga: 1, nombre: id, pulso: 250 });
+  const total = [0, 0, 0, 0];
+  for (const m of msgs.slice(1, -1)) {
+    assert.strictEqual(m.desde, total[m.parte]);
+    total[m.parte] += m.pasos.split(',').length;
+  }
+  assert.strictEqual(msgs.at(-1).totales, total.join(','));
+  assert.strictEqual(total[2], 40);
+  assert.deepStrictEqual(o.alMqtt('orquesta/control/cancion/ack', '{"carga":99,"ok":true}').mqtt, []);
+  const a = o.alMqtt('orquesta/control/cancion/ack', '{"carga":1,"ok":true}');
+  assert.deepStrictEqual(JSON.parse(a.mqtt[0].payload), { id: r.cuerpo.id, modo: 'cancion', cancion: id });
+  o.alMqtt('orquesta/control/modo/ack', JSON.stringify({ id: r.cuerpo.id, ok: true, modo: 'cancion' }));
+  assert.strictEqual(o.alConectar()[0].cancion, 'Mi canción');
+  // Ya la tiene: no se vuelve a mandar… salvo que se edite.
+  assert.strictEqual(o.alHttp('POST', 'modo', { modo: 'cancion', cancion: 'Mi canción' }).mqtt.length, 1);
+  assert.strictEqual(o.alHttp('POST', 'canciones/editar', { ...MIA, id, pulso_ms: 300 }).codigo, 200);
+  assert.ok(o.alHttp('POST', 'modo', { modo: 'cancion', cancion: 'Mi canción' }).mqtt.length > 1);
+});
+
+test('canción que no llega: reintenta una vez y avisa a la pantalla', () => {
+  const { o, reloj } = nueva();
+  enLinea(o);
+  o.alHttp('POST', 'canciones', MIA);
+  const r = o.alHttp('POST', 'modo', { modo: 'cancion', cancion: MIA.nombre });
+  const otra = o.alMqtt('orquesta/control/cancion/ack', '{"carga":1,"ok":false}');
+  assert.strictEqual(JSON.parse(otra.mqtt[0].payload).carga, 2);
+  reloj.t += 2100;
+  const fin = o.alSegundo();
+  assert.deepStrictEqual(fin.mqtt, []);
+  assert.ok(fin.ws.some((m) => m.tipo === 'modo' && m.id === r.cuerpo.id && m.ok === false));
+});
+
+test('canciones: crear, repetir nombre, incluidas y borrar', () => {
+  const { o } = nueva();
+  enLinea(o);
+  const p = (ruta, d) => o.alHttp('POST', ruta, d);
+  assert.strictEqual(o.alHttp('GET', 'canciones').cuerpo.length, 13);
+  assert.strictEqual(p('canciones', { ...MIA, nombre: 'estrellita' }).codigo, 400);
+  assert.strictEqual(p('canciones', { ...MIA, melodia: [] }).codigo, 400);
+  assert.strictEqual(p('canciones', { ...MIA, nombre: { a: 1 } }).codigo, 400);
+  const { id } = p('canciones', MIA).cuerpo;
+  assert.strictEqual(p('canciones/editar', { ...MIA, id }).codigo, 200); // su propio nombre no choca
+  assert.strictEqual(p('canciones/editar', { ...MIA, id: 'estrellita', nombre: 'x' }).codigo, 404);
+  assert.strictEqual(p('canciones/borrar', { id: 'estrellita' }).codigo, 404);
+  o.datos.cancion = id;
+  assert.strictEqual(p('canciones/borrar', { id }).codigo, 409);
+  o.datos.cancion = 'estrellita';
+  assert.strictEqual(p('canciones/borrar', { id }).codigo, 204);
+  assert.strictEqual(o.alHttp('GET', 'canciones').cuerpo.length, 13);
+  assert.deepStrictEqual(Object.keys(p('canciones/arreglar', MIA).cuerpo.partes), ['osito', 'ranita', 'gatito', 'pollito']);
+  assert.strictEqual(p('canciones/arreglar', {}).codigo, 400);
+});
+
+test('grabar con el gatito: lo que se oyó, en la rejilla', () => {
+  const { o, reloj } = nueva();
+  assert.strictEqual(o.alHttp('POST', 'canciones/grabar', { accion: 'empezar' }).codigo, 503);
+  enLinea(o);
+  assert.strictEqual(o.alHttp('POST', 'canciones/grabar', { accion: 'empezar' }).codigo, 409); // no está en Libre
+  o.datos.modo = 'libre';
+  o.alHttp('POST', 'canciones/grabar', { accion: 'empezar' });
+  assert.strictEqual(o.alHttp('POST', 'canciones/grabar', { accion: 'terminar' }).codigo, 409); // sin notas
+  o.alHttp('POST', 'canciones/grabar', { accion: 'empezar' });
+  let seq = 0;
+  const toca = (n, vel) => { seq += 1; return o.alMqtt('orquesta/gatito/evento', sobre('gatito', seq, { tipo: 'nota', nota: n, vel })); };
+  assert.ok(toca('do', 100).ws.some((m) => m.tipo === 'grabacion' && m.notas === 1));
+  reloj.t += 480; toca('do', 0);
+  reloj.t += 30; toca('fa', 100); // fa suena sol (67)
+  reloj.t += 250; toca('fa', 0);
+  reloj.t += 740; toca('si', 100);
+  reloj.t += 1000; toca('si', 0);
+  const r = o.alHttp('POST', 'canciones/grabar', { accion: 'terminar' });
+  assert.deepStrictEqual(r.cuerpo, { melodia: [[60, 2], [67, 1], [0, 3], [74, 4]], pulso_ms: 250 });
+  o.alHttp('POST', 'canciones/grabar', { accion: 'empezar' });
+  reloj.t += 61000;
+  assert.ok(o.alSegundo().ws.some((m) => m.tipo === 'grabacion' && m.activa === false));
+});
+
+test('panel y teclas', () => {
+  const { o } = nueva();
+  assert.strictEqual(o.alHttp('POST', 'tecla', { tecla: '8' }).codigo, 503);
+  enLinea(o);
+  for (const t of ['z', '', '12', 8, null]) assert.strictEqual(o.alHttp('POST', 'tecla', { tecla: t }).codigo, 400);
+  const r = o.alHttp('POST', 'tecla', { tecla: 'd' });
+  assert.deepStrictEqual([r.codigo, r.urgente, r.mqtt[0].payload], [204, true, '{"tecla":"d"}']);
+  assert.deepStrictEqual(o.alMqtt('orquesta/osito/tecla', '{"tecla":"#"}').ws, [{ tipo: 'tecla', tecla: '#' }]);
+  assert.deepStrictEqual(o.alMqtt('orquesta/osito/tecla', '{"tecla":"<"}').ws, []);
+  const w = o.alMqtt('orquesta/osito/panel', '{"tempo":110,"eco":true,"ritmo":"pop","acordes":false,"loop":"sonando","capas":2,"callados":8,"nivel":3,"avance":45}').ws;
+  assert.deepStrictEqual(w[0].callados, ['pollito']);
+  assert.deepStrictEqual(w[1], { tipo: 'cancion', progreso: 0.45 });
+  assert.ok(o.alConectar().some((m) => m.tipo === 'panel'));
+});
+
+test('a la nube nunca iría el nombre ni la nota', () => {
+  const { paraNube } = require('../almacen.js');
+  const t = JSON.stringify(paraNube({ ninos: [{ alias: 'A-01', nombre: 'Ana' }], sesiones: [{ alias: 'A-01', nota: 'Ana mejoró' }], canciones: [] }));
+  assert.ok(!t.includes('Ana') && t.includes('A-01'));
 });

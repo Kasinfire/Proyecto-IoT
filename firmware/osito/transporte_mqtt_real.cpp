@@ -27,7 +27,7 @@ constexpr uint32_t PILA_TAREA = 8192;
 constexpr UBaseType_t PRIORIDAD_TAREA = 1;
 constexpr BaseType_t NUCLEO_RED = 0;  // el loop de Arduino corre en el 1
 constexpr size_t SALIENTES_EN_COLA = 16;
-constexpr size_t ENTRANTES_EN_COLA = 4;
+constexpr size_t ENTRANTES_EN_COLA = 16;  // una canción llega en varios trozos
 constexpr uint32_t VUELTA_TAREA_MS = 10;
 // Sin esto WiFiClientSecure espera hasta 30 s al conectar y 120 s en el saludo TLS.
 constexpr uint32_t CONEXION_TCP_MS = 5000;
@@ -326,6 +326,8 @@ bool TransporteMqttReal::conectarBroker() {
   if (!cliente_.subscribe(contrato_mqtt::TOPICO_MODO) ||
       !cliente_.subscribe(contrato_mqtt::TOPICO_SYNC_ACK) ||
       !cliente_.subscribe(contrato_mqtt::TOPICO_AVISO) ||
+      !cliente_.subscribe(contrato_mqtt::TOPICO_CANCION) ||
+      !cliente_.subscribe(contrato_mqtt::TOPICO_TECLA_REMOTA) ||
       !cliente_.publish(TOPICO_ESTADO_OSITO, en_linea, true)) {
     Serial.println("[MQTTS] No se pudo completar la suscripción/estado; reconectaré");
     cliente_.disconnect();

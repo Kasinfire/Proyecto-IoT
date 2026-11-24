@@ -39,5 +39,6 @@ size_t alPulso(Nota* salida, size_t max, bool& termino_grabacion);
 bool grabando();
 bool sonando();
 size_t numNotas();
+size_t numCapas();
 uint8_t paso();
 }  // namespace looper

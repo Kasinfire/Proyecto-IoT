@@ -31,18 +31,18 @@ constexpr char TECLA_LARGA = 'D';
 PulsacionLarga larga(config::TECLA_LARGA_MS);
 struct Pulsada {
   char tecla;
-  bool simulada;
+  Origen origen;
 };
 Pulsada cola[COLA_MAX];
 size_t inicio = 0;
 size_t cuantas = 0;
 
-void meter(char tecla, bool simulada) {
+void meter(char tecla, Origen origen) {
   if (cuantas == COLA_MAX) {  // llena: se pierde la más vieja
     inicio = (inicio + 1) % COLA_MAX;
     --cuantas;
   }
-  cola[(inicio + cuantas) % COLA_MAX] = {tecla, simulada};
+  cola[(inicio + cuantas) % COLA_MAX] = {tecla, origen};
   ++cuantas;
 }
 
@@ -90,27 +90,31 @@ void actualizar() {
         const PulsacionLarga::Tipo tipo = larga.actualizar(filtros[f][c].presionado(), ahora_ms);
         if (tipo != PulsacionLarga::Tipo::Nada) {
           meter(tipo == PulsacionLarga::Tipo::Larga ? acciones_dj::TECLA_D_LARGA : TECLA_LARGA,
-                false);
+                Origen::Fisica);
         }
       } else if (se_presiono) {
-        meter(acciones_dj::TECLAS[f][c], false);
+        meter(acciones_dj::TECLAS[f][c], Origen::Fisica);
       }
     }
   }
 }
 
-bool siguienteTecla(char& tecla, bool& simulada) {
+bool siguienteTecla(char& tecla, Origen& origen) {
   if (cuantas == 0) {
     return false;
   }
   tecla = cola[inicio].tecla;
-  simulada = cola[inicio].simulada;
+  origen = cola[inicio].origen;
   inicio = (inicio + 1) % COLA_MAX;
   --cuantas;
   return true;
 }
 
+void meterRemota(char tecla) {
+  meter(tecla, Origen::Remota);
+}
+
 void simularTecla(char tecla) {
-  meter(tecla, true);
+  meter(tecla, Origen::Simulada);
 }
 }  // namespace teclado_dj

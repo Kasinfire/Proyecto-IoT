@@ -31,7 +31,9 @@ Sintetizador* sinte = nullptr;  // apunta a `efectos`, que pasa todo al sintetiz
 EfectosDj efectos;
 Sintetizador* salida_real = nullptr;  // la banda de fondo no lleva eco
 Modo modo_actual = Modo::Cancion;
-const canciones::Cancion* cancion_actual = &canciones::LISTA[0];
+const canciones::Cancion* cancion_actual = &canciones::PRUEBA;
+uint32_t pulsos_cancion = 0;  // lo que dura su melodía
+uint32_t pulso_cancion = 0;   // por dónde va
 uint32_t ultimo_pulso_ms = 0;
 uint32_t ultimo_fade_ms = 0;
 uint32_t ultima_actualizacion_ms = 0;
@@ -428,6 +430,7 @@ void alPulso(uint32_t ahora_ms) {
   hubo_pulso = hubo_pulso || acompanamiento::encendido();
   if (modo_actual == Modo::Cancion) {
     tocarPulso(ahora_ms);
+    pulso_cancion = (pulso_cancion + 1) % pulsos_cancion;
     hubo_pulso = true;
   }
   looper::Nota notas[config::LOOP_NOTAS_MAX];
@@ -464,6 +467,12 @@ void prepararModo(uint32_t ahora_ms) {
   ultima_actualizacion_ms = ahora_ms;
   hay_luz = false;
   hay_reto = false;
+  pulso_cancion = 0;
+  pulsos_cancion = 0;
+  const canciones::Parte& melodia = cancion_actual->partes[protocolo::aEntero(Nodo::Gatito)];
+  for (size_t i = 0; i < melodia.num_pasos; ++i) {
+    pulsos_cancion += melodia.pasos[i].pulsos;
+  }
   acompanamiento::callar(*salida_real);
   efectos.pausar(modo_actual == Modo::Simon);
   // En Libre y Simón cada gesto suena a todo volumen; en Canción lo controla el fade.
@@ -479,7 +488,8 @@ void prepararModo(uint32_t ahora_ms) {
 }
 }  // namespace
 
-void iniciar(Sintetizador& sintetizador, uint32_t semilla, uint32_t ahora_ms) {
+void iniciar(Sintetizador& sintetizador, uint32_t semilla, uint32_t ahora_ms,
+             const char* cancion_inicial) {
   salida_real = &sintetizador;
   efectos.conectar(sintetizador);
   efectos.reiniciar();
@@ -496,7 +506,11 @@ void iniciar(Sintetizador& sintetizador, uint32_t semilla, uint32_t ahora_ms) {
   nota_pista = SIN_NOTA;
   hay_respuesta = false;
   modo_actual = Modo::Cancion;
-  cancion_actual = &canciones::LISTA[0];
+  cancion_recibida::reiniciar();
+  cancion_actual = canciones::buscar(cancion_inicial);
+  if (cancion_actual == nullptr) {
+    cancion_actual = &canciones::PRUEBA;
+  }
   hay_luz = false;
   hay_resultado = false;
   hubo_pulso = false;
@@ -562,6 +576,31 @@ bool elegirCancion(const char* nombre) {
     prepararModo(ultima_actualizacion_ms);
   }
   return true;
+}
+
+const canciones::Cancion* cancionEnUso() {
+  return cancion_actual;
+}
+
+Panel panel() {
+  Panel p = {};
+  p.tempo = tempo_pct;
+  p.eco = efectos.eco();
+  p.ritmo = acompanamiento::ritmoPedido();
+  p.acordes = acompanamiento::acordesPedidos();
+  p.loop = looper::grabando()        ? EstadoLoop::Grabando
+           : looper::sonando()       ? EstadoLoop::Sonando
+           : looper::numNotas() > 0  ? EstadoLoop::Parado
+                                     : EstadoLoop::Vacio;
+  p.capas = static_cast<uint8_t>(looper::numCapas());
+  for (size_t i = 0; i < protocolo::NUM_NODOS; ++i) {
+    p.callados |= static_cast<uint8_t>(silenciados[i] ? 1u << i : 0u);
+  }
+  p.nivel = simon::nivel();
+  p.avance = modo_actual == Modo::Cancion
+                 ? static_cast<uint8_t>(pulso_cancion * 100 / pulsos_cancion)
+                 : 0;
+  return p;
 }
 
 const char* cancion() {

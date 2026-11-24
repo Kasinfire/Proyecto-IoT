@@ -37,7 +37,7 @@ function pintar(ninos) {
       el('div', { class: 'nino__cabeza' },
         favorito
           ? cuadroCara(favorito.id, 64, 44, n.en_sesion ? '#ffffff' : `var(--${favorito.id}-claro)`)
-          : el('div', { class: 'cuadro-cara', style: { width: '64px', height: '64px', background: '#ffffff' } }),
+          : el('div', { class: 'cuadro-cara', style: { width: '64px', height: '64px', background: '#ffffff' }, 'aria-hidden': 'true' }, el('span', { class: 'nino__inicial' }, [...(n.nombre || n.alias)][0].toUpperCase())),
         el('div', {},
           el('h2', { class: 'nino__alias' }, n.nombre || n.alias),
           el('p', { class: 'nino__sesiones' }, `${n.nombre ? `${n.alias} · ` : ''}${n.sesiones} ${n.sesiones === 1 ? 'sesión' : 'sesiones'}`)),

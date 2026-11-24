@@ -21,7 +21,7 @@ completa está en [`orquesta-proyecto.md`](../../orquesta-proyecto.md).
 - Broker: TLS validado contra `certs/ca.crt`; usuario `osito` publica lo permitido, la ACL bloquea
   `control/modo` y una contraseña mala da `not authorised`.
 
-**Simulación:** `./pruebas/correr.sh` en la compu: **197 de 197 pruebas**. Son de lógica, con stubs y
+**Simulación:** `./pruebas/correr.sh` en la compu: **222 de 222 pruebas**. Son de lógica, con stubs y
 sin placa: no comprueban ESP-NOW, el cifrado, el TLS ni el hardware.
 
 **Pendiente en físico:** el rojo del GPIO21 ante una desconexión; el Simón progresivo, la banda de fondo, el looper y
@@ -46,6 +46,8 @@ que ESP-NOW y la cola sobrevivan a una caída de Wi-Fi o del broker; la ranita e
 | `teclado_dj`                       | Lee el teclado 4x4 sin bloquear, con antirrebote por tecla              | sí                   |
 | `acciones_dj`                      | Qué hace cada tecla                                                     | no                   |
 | `looper`, `efectos_dj`             | Looper (encima y deshace capas) y efectos: eco, redoble, subida y caída | no                   |
+| `cancion_recibida`                 | Recibe por trozos una canción de la página                              | no                   |
+| `panel_json`                       | Estado del panel DJ para la página                                      | no                   |
 | `acompanamiento`                   | Banda de fondo: ritmos y acordes                                        | no                   |
 | `contrato_mqtt`, `cola_eventos`    | JSON, tópicos MQTT y cola que espera el acuse                           | no                   |
 | `nube`, `transporte_*`             | Cola de eventos y MQTTS real (en su propia tarea); simulador aislado    | sí                   |
@@ -160,6 +162,9 @@ Wi-Fi, NTP, TLS y MQTT corren en una tarea propia (núcleo 0): un broker caído 
 | `orquesta/osito/volumen` | `{"valor":0..127}`, retenido, máximo 2 por segundo |
 | `orquesta/osito/cola` | `{"pendientes":N,"descartados":D}`, retenido |
 | `orquesta/control/modo` → `…/modo/ack` | Pedido de Node-RED y su acuse (Request/Response) |
+| `orquesta/osito/panel`, `orquesta/osito/tecla` | Estado del teclado DJ (retenido) y cada tecla apretada |
+| `orquesta/control/tecla` | `{"tecla":"8"}`: como apretarla; `d` es D mantenida |
+| `orquesta/control/cancion` → `…/cancion/ack` | Canción propia por trozos; solo se puede elegir si llegó completa |
 | `orquesta/control/aviso` | `{"silenciar":true|false}`: calla el sonido de desconexión (el LED sigue) |
 | `orquesta/sync/ack` | `{"hasta_seq":N}`: solo así se borran eventos de la cola |
 
@@ -173,8 +178,7 @@ llega al broker real, y un `sim mqtt ack` no borra la cola real.
   broker. El hotspot del iPhone elige el canal solo: revisar el canal en cada arranque.
 - Node-RED: descifrar el sobre `seq`/`data`, mandar `orquesta/sync/ack` y traducir al WebSocket de
   la interfaz web (PR #13).
-- Acordar la lista de canciones con la interfaz web: el osito solo tiene "prueba" y rechaza las demás.
-- La canción final aún no está: `canciones.h` solo tiene "prueba".
+- Las melodías incluidas (`nodered/canciones.json` → `canciones_datos.h` con `herramientas/generar_canciones.mjs`) falta oírlas con los animales.
 - `seq` MQTT vuelve a 1 al encender el osito y la cola de 64 eventos vive en RAM; faltan persistencia
   y un identificador de arranque para hacer la sincronización resistente a reinicios.
 - El gatito todavía usa `enlace_simulado`; `filtro_boton` podría migrar al `Antirrebote` común.

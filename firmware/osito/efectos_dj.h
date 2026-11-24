@@ -26,6 +26,9 @@ class EfectosDj : public Sintetizador {
   // Lleva el redoble y la subida, que van más rápido que el pulso.
   void avanzar(uint32_t ahora_ms);
 
+  bool eco() const {
+    return eco_;
+  }
   bool alternarEco();     // true si quedó encendido
   void redoble(uint32_t ahora_ms, uint32_t pulso_ms);
   void subida(uint32_t ahora_ms, uint32_t pulso_ms);

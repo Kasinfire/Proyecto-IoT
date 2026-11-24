@@ -15,6 +15,8 @@ void reiniciar();
 Ritmo siguienteRitmo();   // el que sonará desde el siguiente compás
 bool alternarAcordes();   // true si quedaron encendidos
 bool encendido();
+Ritmo ritmoPedido();
+bool acordesPedidos();
 void alPulso(Sintetizador& salida);
 void callar(Sintetizador& salida);  // suelta el acorde; lo elegido se conserva
 }  // namespace acompanamiento

@@ -140,6 +140,10 @@ bool sonando() {
   return esta_sonando;
 }
 
+size_t numCapas() {
+  return num_capas;
+}
+
 size_t numNotas() {
   return num_notas;
 }

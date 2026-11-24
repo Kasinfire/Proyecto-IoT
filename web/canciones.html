@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Canciones · Orquesta</title>
+<link rel="icon" href="icono.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/base.css">
 <link rel="stylesheet" href="css/componentes.css">
 <link rel="stylesheet" href="css/pantallas.css">
@@ -28,12 +29,78 @@
 <div class="titulo-con-filtros">
   <h1 class="titulo-pagina">Canciones</h1>
   <div class="filtros" id="filtros" role="group" aria-label="Filtrar canciones"></div>
+  <div class="filtros-fila">
+    <button class="boton" type="button" id="grabar">Grabar con el gatito</button>
+    <button class="boton boton--principal" type="button" id="crear">Crear canción</button>
+  </div>
 </div>
 
 <p class="vacio" id="error" role="alert" hidden></p>
-<div class="canciones" id="canciones" aria-live="polite"></div>
+<div class="canciones" id="canciones"></div>
 
 </div>
+
+<dialog class="ventana ventana--ancha" id="ventana-editor" aria-labelledby="t-editor">
+  <form class="ventana__contenido" method="dialog" id="form-editor" novalidate>
+    <h2 class="ventana__titulo" id="t-editor"></h2>
+    <div class="editor__fila">
+      <div class="campo"><label for="ed-nombre">Nombre</label><input class="entrada" id="ed-nombre" maxlength="40" autocomplete="off"></div>
+      <div class="campo"><label for="ed-tipo">Tipo</label>
+        <select class="entrada" id="ed-tipo">
+          <option value="alegres">Alegre</option><option value="tranquilas">Tranquila</option><option value="navidad">Navidad</option>
+          <option value="cumpleanos">Cumpleaños</option><option value="bloques">Bloques</option><option value="mias">Otra</option>
+        </select></div>
+      <div class="campo"><label for="ed-ritmo">Ritmo</label>
+        <select class="entrada" id="ed-ritmo">
+          <option value="marcha-8">Marcha (4/4)</option><option value="suave-8">Suave (4/4)</option>
+          <option value="vals-6">Vals (3/4)</option><option value="suave-6">Suave (3/4)</option>
+        </select></div>
+      <div class="campo"><label for="ed-velocidad">Velocidad</label><input type="range" id="ed-velocidad" min="140" max="420" step="10"></div>
+    </div>
+    <div class="campo">
+      <span class="editor__etiqueta">Melodía</span>
+      <div class="editor__melodia" id="ed-melodia" role="group" aria-label="Notas de la melodía"></div>
+      <p class="texto-ayuda" id="ed-cuenta" aria-live="polite"></p>
+    </div>
+    <div class="editor__notas" id="ed-notas" role="group" aria-label="Agregar nota"></div>
+    <div class="editor__fila">
+      <div class="filtros" id="ed-duraciones" role="group" aria-label="Duración"></div>
+      <button class="boton" type="button" id="ed-quitar"></button>
+      <button class="boton" type="button" id="ed-vaciar">Vaciar</button>
+    </div>
+    <p class="ventana__error" id="ed-error" role="alert" hidden></p>
+    <div class="ventana__acciones">
+      <button class="boton" type="submit" value="cancelar" formnovalidate>Cancelar</button>
+      <button class="boton" type="button" id="ed-oir">Oír</button>
+      <button class="boton boton--principal" type="submit" value="guardar" id="ed-guardar">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="ventana" id="ventana-grabar" aria-labelledby="t-grabar">
+  <div class="ventana__contenido">
+    <h2 class="ventana__titulo" id="t-grabar">Grabando el gatito</h2>
+    <p>Toca la melodía en el gatito, una nota a la vez. Se guarda como se oye. Máximo 1 minuto.</p>
+    <p class="grabar__cuenta" id="grabar-cuenta" aria-live="polite"></p>
+    <p class="ventana__error" id="grabar-error" role="alert" hidden></p>
+    <div class="ventana__acciones">
+      <button class="boton" type="button" id="grabar-cancelar">Cancelar</button>
+      <button class="boton boton--principal" type="button" id="grabar-terminar">Terminar</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="ventana" id="ventana-borrar" aria-labelledby="t-borrar">
+  <form class="ventana__contenido" method="dialog" id="form-borrar">
+    <h2 class="ventana__titulo" id="t-borrar"></h2>
+    <p>No se puede deshacer.</p>
+    <p class="ventana__error" id="borrar-error" role="alert" hidden></p>
+    <div class="ventana__acciones">
+      <button class="boton" type="submit" value="cancelar" autofocus>Cancelar</button>
+      <button class="boton boton--alerta" type="submit" value="borrar">Borrar</button>
+    </div>
+  </form>
+</dialog>
 
 <script type="module" src="js/canciones.js"></script>
 </body>

@@ -4,14 +4,21 @@
 'use strict';
 
 const crypto = require('node:crypto');
-const fs = require('node:fs');
-const path = require('node:path');
+const { AlmacenArchivo } = require('./almacen.js');
+const arreglo = require('./arreglo.js');
+const { PULSO_MS: PULSO_GRABACION_MS, aMelodia } = require('./grabacion.js');
 
 const NODOS = ['osito', 'ranita', 'gatito', 'pollito'];
 const ANIMALES = ['gatito', 'ranita', 'pollito'];
 const MODOS = ['cancion', 'libre', 'simon'];
-// Solo lo que el osito tiene transcrito en canciones.h; cualquier otra la rechaza.
-const CANCIONES = [{ nombre: 'prueba', tipo: 'alegres', duracion: '0:04' }];
+const INCLUIDAS = arreglo.incluidas(); // las trae el osito en su firmware
+const CANCION_DIAGNOSTICO = 'prueba';
+const CANCIONES_MAX = 200;
+const TECLAS = '123A456B789C*0#Dd';
+const PASOS_POR_TROZO = 16; // cabe en los 256 bytes que acepta el osito
+const ESPERA_CARGA_MS = 2000;
+const INTENTOS_CARGA = 2;
+const GRABAR_MAX_MS = 60000;
 const ALIAS = /^([A-Z]{1,2})-?([0-9]{1,3})$/;
 const NOMBRE_MAX = 40;
 const NONCE_BYTES = 12;
@@ -60,18 +67,18 @@ const resumenVacio = () => ({
 });
 
 class Orquesta {
-  constructor({ claveHex, archivo, ahora = Date.now, aviso = () => {} }) {
+  constructor({ claveHex, archivo, almacen = new AlmacenArchivo(archivo), ahora = Date.now, aviso = () => {} }) {
     if (!/^[0-9a-fA-F]{32}$/.test(claveHex || '')) {
       throw new Error('MQTT_AES_KEY_HEX debe tener 32 caracteres hex');
     }
     this.clave = Buffer.from(claveHex, 'hex');
-    this.archivo = archivo;
+    this.almacen = almacen;
     this.ahora = ahora;
     this.aviso = aviso;
     // Lo que se conserva al reiniciar Node-RED.
     this.datos = {
       ninos: [], sesiones: [], sesion: null, siguienteId: 1, avisoSilenciado: false,
-      modo: 'cancion', cancion: CANCIONES[0].nombre, sync: { arranque: null, hasta: 0, recibidos: [] },
+      modo: 'cancion', cancion: INCLUIDAS[0].id, canciones: [], siguienteCarga: 1, sync: { arranque: null, hasta: 0, recibidos: [] },
     };
     this.conectado = {};
     this.ultimoGesto = {};
@@ -82,23 +89,25 @@ class Orquesta {
     this.volvioEn = null; // reconectado, falta que diga cuántos eventos traía
     this.huecoDesde = null;
     this.pedidos = new Map(); // id -> canción pedida
+    this.carga = null; // canción que se le está mandando al osito
+    this.cancionCambiada = false; // se editó la que está sonando
+    this.panel = null;
+    this.grabacion = null;
     this.guardado = null;
     this.cargar();
   }
 
   cargar() {
-    if (!this.archivo || !fs.existsSync(this.archivo)) return;
-    // Si el archivo está dañado se avisa y no se arranca: escribir encima perdería el historial.
-    Object.assign(this.datos, JSON.parse(fs.readFileSync(this.archivo, 'utf8')));
+    const leido = this.almacen.leer();
+    if (leido) Object.assign(this.datos, leido);
+    // Antes se guardaba el nombre tal cual lo mandaba el osito; ahora es el id.
+    if (!this.buscarCancion(this.datos.cancion) && this.datos.cancion !== CANCION_DIAGNOSTICO) {
+      this.datos.cancion = INCLUIDAS[0].id;
+    }
   }
 
   guardar() {
-    if (this.archivo) {
-      fs.mkdirSync(path.dirname(this.archivo), { recursive: true });
-      const temporal = `${this.archivo}.tmp`;
-      fs.writeFileSync(temporal, JSON.stringify(this.datos), { mode: 0o600 });
-      fs.renameSync(temporal, this.archivo); // nunca queda a medias
-    }
+    this.almacen.guardar(this.datos);
     this.guardado = this.ahora();
   }
 
@@ -120,10 +129,13 @@ class Orquesta {
     }
     const [, nodo, cual, tercero] = topic.split('/');
     if (topic === 'orquesta/control/modo/ack') this.alAckModo(datos, salida);
+    else if (topic === 'orquesta/control/cancion/ack') this.alAckCancion(datos, salida);
     else if (!NODOS.includes(nodo) || tercero) return salida;
     else if (cual === 'estado') this.alEstado(nodo, datos, salida);
     else if (cual === 'evento') this.alSobre(nodo, datos, salida);
     else if (topic === 'orquesta/osito/volumen') this.alVolumen(datos, salida);
+    else if (topic === 'orquesta/osito/panel') this.alPanel(datos, salida);
+    else if (topic === 'orquesta/osito/tecla') this.alTecla(datos, salida);
     else if (topic === 'orquesta/osito/cola') this.alCola(datos, salida);
     return salida;
   }
@@ -176,12 +188,119 @@ class Orquesta {
     if (!MODOS.includes(datos.modo)) return;
     if (datos.ok) {
       this.datos.modo = datos.modo;
-      this.datos.cancion = this.pedidos.get(datos.id) ?? this.datos.cancion;
+      const pedida = this.pedidos.get(datos.id);
+      if (pedida) {
+        this.datos.cancion = pedida;
+        this.cancionCambiada = false;
+      }
       this.anotarModo(datos.modo);
       this.guardar();
     }
     this.pedidos.delete(datos.id);
-    salida.ws.push({ tipo: 'modo', id: datos.id, ok: Boolean(datos.ok), modo: this.datos.modo, cancion: this.datos.cancion });
+    salida.ws.push({ tipo: 'modo', id: datos.id, ok: Boolean(datos.ok), modo: this.datos.modo, cancion: this.nombreCancion() });
+  }
+
+  alPanel(datos, salida) {
+    if (!Number.isFinite(datos.tempo)) return;
+    const n = (x) => (Number.isFinite(x) ? x : 0);
+    const { tempo, eco, ritmo, acordes, loop, capas, callados, nivel, avance } = datos;
+    this.panel = {
+      tipo: 'panel', tempo, eco: eco === true, ritmo: String(ritmo), acordes: acordes === true, loop: String(loop),
+      capas: n(capas), callados: NODOS.filter((_, i) => n(callados) & (1 << i)), nivel: n(nivel),
+    };
+    salida.ws.push(this.panel);
+    if (this.datos.modo === 'cancion') salida.ws.push({ tipo: 'cancion', progreso: n(avance) / 100 });
+  }
+
+  alTecla(datos, salida) {
+    if (typeof datos.tecla === 'string' && datos.tecla.length === 1 && TECLAS.includes(datos.tecla)) {
+      salida.ws.push({ tipo: 'tecla', tecla: datos.tecla });
+    }
+  }
+
+  // ---------- Canciones ----------
+
+  todas() {
+    return [...INCLUIDAS, ...this.datos.canciones];
+  }
+
+  buscarCancion(id) {
+    return this.todas().find((c) => c.id === id);
+  }
+
+  // Las pantallas usan el nombre; por MQTT viaja el id.
+  porNombre(nombre) {
+    const buscado = String(nombre ?? '').trim().toLocaleLowerCase('es');
+    return this.todas().find((c) => c.nombre.toLocaleLowerCase('es') === buscado);
+  }
+
+  nombreCancion(id = this.datos.cancion) {
+    return this.buscarCancion(id)?.nombre ?? id;
+  }
+
+  // Los mensajes que le mandan una canción al osito.
+  trozos(cancion, carga) {
+    const partes = arreglo.arreglar(cancion);
+    const msgs = [{ carga, nombre: cancion.id, pulso: cancion.pulso_ms }];
+    arreglo.PARTES.forEach((parte, k) => {
+      for (let i = 0; i < partes[parte].length; i += PASOS_POR_TROZO) {
+        const pasos = partes[parte].slice(i, i + PASOS_POR_TROZO).map(([n, d, v = 0]) => `${n}.${d}.${v}`).join(',');
+        msgs.push({ carga, parte: k, desde: i, pasos });
+      }
+    });
+    msgs.push({ carga, totales: arreglo.PARTES.map((p) => partes[p].length).join(',') });
+    return msgs.map((m) => ({ topic: 'orquesta/control/cancion', payload: JSON.stringify(m) }));
+  }
+
+  mandarCancion(cancion, pedido, intento = 1) {
+    const numero = this.datos.siguienteCarga;
+    this.datos.siguienteCarga += 1;
+    this.carga = { numero, cancion, pedido, intento, desde: this.ahora() };
+    return this.trozos(cancion, numero);
+  }
+
+  alAckCancion(datos, salida) {
+    if (!this.carga || datos.carga !== this.carga.numero) return;
+    const { pedido } = this.carga;
+    if (datos.ok) {
+      this.carga = null;
+      salida.mqtt.push({ topic: 'orquesta/control/modo', payload: JSON.stringify(pedido) });
+    } else {
+      this.reintentarCarga(salida);
+    }
+  }
+
+  reintentarCarga(salida) {
+    const { cancion, pedido, intento } = this.carga;
+    if (intento < INTENTOS_CARGA && this.ositoEnLinea) {
+      salida.mqtt.push(...this.mandarCancion(cancion, pedido, intento + 1));
+      return;
+    }
+    this.carga = null;
+    this.pedidos.delete(pedido.id);
+    this.aviso(`El osito no pudo recibir la canción ${cancion.id}`);
+    salida.ws.push({ tipo: 'modo', id: pedido.id, ok: false, modo: this.datos.modo, cancion: this.nombreCancion() });
+  }
+
+  // Para la pantalla: con la melodía, para poder duplicarla o editarla.
+  fichaCancion(c) {
+    return {
+      id: c.id, nombre: c.nombre, tipo: c.tipo, duracion: arreglo.duracion(c), incluida: Boolean(c.incluida),
+      melodia: c.melodia, compas: c.compas, estilo: c.estilo, pulso_ms: c.pulso_ms,
+    };
+  }
+
+  // { cancion } ya limpia, o { error }.
+  leerCancion(cuerpo, propia = null) {
+    const c = {
+      nombre: typeof cuerpo.nombre === 'string' ? cuerpo.nombre.replace(/\s+/g, ' ').trim() : '', tipo: cuerpo.tipo, estilo: cuerpo.estilo,
+      compas: cuerpo.compas, pulso_ms: cuerpo.pulso_ms, melodia: cuerpo.melodia,
+    };
+    const error = arreglo.revisar(c);
+    if (error) return { error };
+    const otra = this.porNombre(c.nombre);
+    if (otra && otra !== propia) return { error: 'ya existe una canción con ese nombre' };
+    return { cancion: c };
   }
 
   alSobre(nodo, sobre, salida) {
@@ -234,6 +353,7 @@ class Orquesta {
     const sesion = this.datos.sesion;
     switch (evento.tipo) {
       case 'nota':
+        this.anotarGrabacion(evento, salida);
         if (evento.vel > 0) {
           this.ultimoGesto[nodo] = this.ahora();
           if (sesion) sesion.resumen.gestos.gatito += 1;
@@ -257,10 +377,11 @@ class Orquesta {
         if (!MODOS.includes(evento.modo)) break;
         this.datos.modo = evento.modo;
         this.datos.cancion = evento.cancion;
+        if (evento.origen === 'arranque') this.cancionCambiada = false;
         this.anotarModo(evento.modo);
         // El que pidió Node-RED ya llegó por el acuse, con su id.
         if (evento.origen !== 'nodered') {
-          salida.ws.push({ tipo: 'modo', id: null, ok: true, modo: evento.modo, cancion: evento.cancion });
+          salida.ws.push({ tipo: 'modo', id: null, ok: true, modo: evento.modo, cancion: this.nombreCancion() });
         }
         break;
       case 'simon':
@@ -279,6 +400,16 @@ class Orquesta {
     }
   }
 
+  anotarGrabacion(evento, salida) {
+    if (!this.grabacion) return;
+    const { toques } = this.grabacion;
+    for (const x of toques) if (x.nota === evento.nota && x.fin === null) x.fin = this.ahora();
+    if (evento.vel > 0) {
+      toques.push({ nota: evento.nota, inicio: this.ahora(), fin: null });
+      salida.ws.push({ tipo: 'grabacion', activa: true, notas: toques.length });
+    }
+  }
+
   // Cada segundo: cuenta el tiempo tocando juntos y deja de esperar un seq que ya no existe.
   alSegundo() {
     const salida = { ws: [], mqtt: [] };
@@ -290,6 +421,11 @@ class Orquesta {
     if (this.volvioEn !== null && t - this.volvioEn >= ESPERA_COLA_MS) {
       this.volvioEn = null;
       salida.ws.push(this.red());
+    }
+    if (this.carga && t - this.carga.desde >= ESPERA_CARGA_MS) this.reintentarCarga(salida);
+    if (this.grabacion && t - this.grabacion.desde >= GRABAR_MAX_MS && !this.grabacion.llena) {
+      this.grabacion.llena = true; // la pantalla la termina
+      salida.ws.push({ tipo: 'grabacion', activa: false, notas: this.grabacion.toques.length });
     }
     if (this.huecoDesde !== null && t - this.huecoDesde >= ESPERA_HUECO_MS) {
       const s = this.datos.sync;
@@ -312,6 +448,7 @@ class Orquesta {
       if (nodo in this.conectado) ws.push({ tipo: 'estado', nodo, conectado: this.estadoDe(nodo) });
     }
     ws.push(this.red());
+    if (this.panel && this.ositoEnLinea) ws.push(this.panel);
     if (this.volumen !== null) ws.push({ tipo: 'volumen', nodo: 'osito', valor: this.volumen });
     return ws;
   }
@@ -320,7 +457,7 @@ class Orquesta {
     const s = this.datos.sesion;
     return {
       tipo: 'sesion', alias: s?.alias ?? null, inicio: s?.inicio ?? null, modo: this.datos.modo,
-      cancion: this.datos.cancion, resumen: s?.resumen ?? resumenVacio(), silenciado: this.datos.avisoSilenciado,
+      cancion: this.nombreCancion(), resumen: s?.resumen ?? resumenVacio(), silenciado: this.datos.avisoSilenciado,
     };
   }
 
@@ -339,15 +476,22 @@ class Orquesta {
       case 'POST modo': {
         if (!MODOS.includes(cuerpo.modo)) return error(400, 'modo desconocido');
         const pedido = { id: this.datos.siguienteId, modo: cuerpo.modo };
+        let cancion = null;
         if (cuerpo.cancion) {
-          if (!CANCIONES.some((c) => c.nombre === cuerpo.cancion)) return error(400, 'el osito no tiene esa canción');
-          pedido.cancion = cuerpo.cancion;
+          cancion = this.porNombre(cuerpo.cancion);
+          if (!cancion) return error(400, 'esa canción ya no está en la lista');
+          // Si ya es la que tiene el osito, no hace falta mandarla otra vez.
+          if (cancion.id !== this.datos.cancion || this.cancionCambiada) pedido.cancion = cancion.id;
         }
         if (!this.ositoEnLinea) return error(503, 'el osito no está en línea');
         this.datos.siguienteId += 1;
         this.pedidos.set(pedido.id, pedido.cancion);
+        // Una canción propia se manda primero; el modo, cuando el osito confirme que llegó completa.
+        const mqtt = pedido.cancion && !cancion.incluida
+          ? this.mandarCancion(cancion, pedido)
+          : [{ topic: 'orquesta/control/modo', payload: JSON.stringify(pedido) }];
         this.guardar();
-        return resp(200, { id: pedido.id }, [], [{ topic: 'orquesta/control/modo', payload: JSON.stringify(pedido) }]);
+        return resp(200, { id: pedido.id }, [], mqtt);
       }
       case 'POST aviso':
         if (typeof cuerpo.silenciar !== 'boolean') return error(400, 'falta silenciar');
@@ -371,7 +515,7 @@ class Orquesta {
         const s = this.datos.sesion;
         if (!s) return error(409, 'no hay una sesión abierta');
         this.datos.sesiones.push({
-          alias: s.alias, inicio: s.inicio, fin: this.ahora(), modos: s.modos, cancion: this.datos.cancion,
+          alias: s.alias, inicio: s.inicio, fin: this.ahora(), modos: s.modos, cancion: this.nombreCancion(),
           resumen: s.resumen, aviso: s.aviso, nota: String(cuerpo.nota ?? '').slice(0, 2000),
         });
         this.datos.sesion = null;
@@ -379,7 +523,60 @@ class Orquesta {
         return resp(204, null, [this.mensajeSesion()]);
       }
       case 'GET canciones':
-        return resp(200, CANCIONES);
+        return resp(200, this.todas().map((c) => this.fichaCancion(c)));
+      case 'POST canciones': {
+        if (this.datos.canciones.length >= CANCIONES_MAX) return error(409, `ya hay ${CANCIONES_MAX} canciones propias`);
+        const { cancion, error: motivo } = this.leerCancion(cuerpo);
+        if (motivo) return error(400, motivo);
+        cancion.id = `m-${crypto.randomBytes(5).toString('hex')}`;
+        this.datos.canciones.push(cancion);
+        this.guardar();
+        return resp(200, { id: cancion.id }, [{ tipo: 'canciones' }]);
+      }
+      case 'POST canciones/editar': {
+        const vieja = this.datos.canciones.find((c) => c.id === cuerpo.id);
+        if (!vieja) return error(404, 'esa canción no se puede editar');
+        const { cancion, error: motivo } = this.leerCancion(cuerpo, vieja);
+        if (motivo) return error(400, motivo);
+        Object.assign(vieja, cancion);
+        if (this.datos.cancion === vieja.id) this.cancionCambiada = true;
+        this.guardar();
+        return resp(200, { id: vieja.id }, [{ tipo: 'canciones' }]);
+      }
+      case 'POST canciones/borrar': {
+        if (!this.datos.canciones.some((c) => c.id === cuerpo.id)) return error(404, 'esa canción no se puede borrar');
+        if (this.datos.cancion === cuerpo.id && this.datos.modo === 'cancion') return error(409, 'está sonando: elige otra antes de borrarla');
+        this.datos.canciones = this.datos.canciones.filter((c) => c.id !== cuerpo.id);
+        this.guardar();
+        return resp(204, null, [{ tipo: 'canciones' }]);
+      }
+      case 'POST canciones/arreglar': {
+        const motivo = arreglo.revisar({ ...cuerpo, nombre: 'x', tipo: 'mias' });
+        if (motivo) return error(400, motivo);
+        return resp(200, { partes: arreglo.arreglar(cuerpo), pulso_ms: cuerpo.pulso_ms });
+      }
+      case 'POST canciones/grabar': {
+        if (cuerpo.accion === 'empezar') {
+          if (!this.ositoEnLinea) return error(503, 'el osito no está en línea');
+          if (this.conectado.gatito !== true) return error(409, 'el gatito no está conectado');
+          if (this.datos.modo !== 'libre') return error(409, 'pon el osito en modo Libre');
+          this.grabacion = { desde: this.ahora(), toques: [], llena: false };
+          return resp(204);
+        }
+        if (!this.grabacion) return error(409, 'no se está grabando');
+        const { toques } = this.grabacion;
+        this.grabacion = null;
+        if (cuerpo.accion === 'cancelar') return resp(204);
+        const melodia = aMelodia(toques, arreglo.PASOS_MAX - 1);
+        if (!melodia.length) return error(409, 'no llegó ninguna nota del gatito');
+        return resp(200, { melodia, pulso_ms: PULSO_GRABACION_MS });
+      }
+      case 'POST tecla': {
+        const { tecla } = cuerpo;
+        if (typeof tecla !== 'string' || tecla.length !== 1 || !TECLAS.includes(tecla)) return error(400, 'tecla desconocida');
+        if (!this.ositoEnLinea) return error(503, 'el osito no está en línea');
+        return { ...resp(204, null, [], [{ topic: 'orquesta/control/tecla', payload: JSON.stringify({ tecla }) }]), urgente: true };
+      }
       case 'GET ninos':
         return resp(200, this.datos.ninos.map((n) => this.fichaNino(n.alias)));
       case 'POST ninos': {
@@ -472,7 +669,7 @@ class Orquesta {
       sesiones: sesiones.map((s) => ({
         fecha: fechaLocal(s.inicio), modos: s.modos, minutos: Math.round((s.fin - s.inicio) / 60000), cancion: s.cancion,
         gestos: ANIMALES.reduce((t, n) => t + s.resumen.gestos[n], 0),
-        simon: s.resumen.simon.turnos ? [s.resumen.simon.aciertos, s.resumen.simon.turnos] : null, aviso: s.aviso,
+        simon: s.resumen.simon.turnos ? [s.resumen.simon.aciertos, s.resumen.simon.turnos] : null, aviso: s.aviso, nota: s.nota || '',
       })),
       reparto: this.reparto(sesiones),
     };

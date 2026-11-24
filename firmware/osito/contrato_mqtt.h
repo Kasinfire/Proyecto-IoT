@@ -23,6 +23,16 @@ constexpr char TOPICO_SYNC_ACK[] = "orquesta/sync/ack";
 constexpr char TOPICO_AVISO[] = "orquesta/control/aviso";
 // Osito -> Node-RED, retenidos (estado, no historial): {"valor":0..127} y
 // {"pendientes":N,"descartados":D} del buffer de eventos.
+// Canción creada en la página, por trozos (ver cancion_recibida.h), y su acuse:
+//   {"carga":5,"nombre":"m-ab12","pulso":250}
+//   {"carga":5,"parte":2,"desde":0,"pasos":"60.2.0,62.2.0"}
+//   {"carga":5,"totales":"8,8,20,6"}          -> {"carga":5,"ok":true}
+constexpr char TOPICO_CANCION[] = "orquesta/control/cancion";
+constexpr char TOPICO_CANCION_ACK[] = "orquesta/control/cancion/ack";
+// Panel DJ: {"tecla":"8"} en los dos sentidos, y el estado (retenido).
+constexpr char TOPICO_TECLA_REMOTA[] = "orquesta/control/tecla";
+constexpr char TOPICO_TECLA[] = "orquesta/osito/tecla";
+constexpr char TOPICO_PANEL[] = "orquesta/osito/panel";
 constexpr char TOPICO_VOLUMEN[] = "orquesta/osito/volumen";
 constexpr char TOPICO_COLA[] = "orquesta/osito/cola";
 constexpr size_t CANCION_MAX = 24;
@@ -51,6 +61,23 @@ bool armarEventoSimon(uint32_t seq, uint32_t t, protocolo::Nodo pedido, simon::R
 bool agregarArranque(char* json, size_t tamano, uint32_t arranque);
 bool armarVolumen(uint8_t valor, char* destino, size_t tamano);
 bool armarCola(size_t pendientes, uint32_t descartados, char* destino, size_t tamano);
+// Lo que cabe en un mensaje de TOPICO_CANCION.
+constexpr size_t PASOS_TEXTO_MAX = 200;
+struct TrozoCancion {
+  enum class Tipo : uint8_t { Inicio, Pasos, Fin } tipo;
+  int32_t carga;
+  char nombre[CANCION_MAX];
+  uint32_t pulso_ms;
+  uint32_t parte;
+  uint32_t desde;
+  char pasos[PASOS_TEXTO_MAX];
+  uint32_t totales[protocolo::NUM_NODOS];
+};
+bool leerTrozoCancion(const char* json, TrozoCancion& trozo);
+bool armarAckCancion(int32_t carga, bool ok, char* destino, size_t tamano);
+// Solo las 16 teclas y 'd' (D mantenida).
+bool leerTecla(const char* json, char& tecla);
+bool armarTecla(char tecla, char* destino, size_t tamano);
 // {"silenciar":true|false}; false si no lo trae.
 bool leerAviso(const char* json, bool& silenciar);
 

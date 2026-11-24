@@ -31,6 +31,13 @@ void alSimon(protocolo::Nodo pedido, simon::Resultado resultado, uint8_t nivel, 
 void alVolumen(uint8_t valor);
 // Pedido de orquesta/control/aviso: true una sola vez por pedido.
 bool sacarAviso(bool& silenciar);
+// Canción de la página, por trozos. Quien la arma responde al final (o si algo falló).
+bool sacarTrozoCancion(contrato_mqtt::TrozoCancion& trozo);
+void responderCancion(int32_t carga, bool ok);
+// Panel DJ.
+bool sacarTeclaRemota(char& tecla);
+void alTecla(char tecla);
+void alPanel(const char* json);  // se publica si cambió
 // Para "sim mqtt modo/ack": entra como si viniera del broker, marcado como SIMULACIÓN.
 void inyectarSimulado(const char* topico, const char* payload);
 }  // namespace nube

@@ -199,6 +199,71 @@ bool armarCola(size_t pendientes, uint32_t descartados, char* destino, size_t ta
               tamano);
 }
 
+bool leerTrozoCancion(const char* json, TrozoCancion& trozo) {
+  trozo = {};
+  long long n = 0;
+  if (json == nullptr || !leerEntero(json, "carga", n) || n < 1 || n > INT32_MAX) {
+    return false;
+  }
+  trozo.carga = static_cast<int32_t>(n);
+  if (leerTexto(json, "nombre", trozo.nombre, sizeof(trozo.nombre))) {
+    trozo.tipo = TrozoCancion::Tipo::Inicio;
+    if (!leerEntero(json, "pulso", n) || n < 0 || n > UINT16_MAX) {
+      return false;
+    }
+    trozo.pulso_ms = static_cast<uint32_t>(n);
+    return true;
+  }
+  if (leerTexto(json, "pasos", trozo.pasos, sizeof(trozo.pasos))) {
+    trozo.tipo = TrozoCancion::Tipo::Pasos;
+    long long desde = 0;
+    if (!leerEntero(json, "parte", n) || !leerEntero(json, "desde", desde) || n < 0 ||
+        n >= static_cast<long long>(protocolo::NUM_NODOS) || desde < 0 || desde > UINT16_MAX) {
+      return false;
+    }
+    trozo.parte = static_cast<uint32_t>(n);
+    trozo.desde = static_cast<uint32_t>(desde);
+    return true;
+  }
+  char totales[32];
+  if (!leerTexto(json, "totales", totales, sizeof(totales))) {
+    return false;
+  }
+  trozo.tipo = TrozoCancion::Tipo::Fin;
+  const char* p = totales;
+  for (size_t i = 0; i < protocolo::NUM_NODOS; ++i) {
+    char* fin = nullptr;
+    const unsigned long valor = strtoul(p, &fin, 10);
+    const char esperado = i + 1 < protocolo::NUM_NODOS ? ',' : '\0';
+    if (fin == p || *fin != esperado || valor > UINT16_MAX) {
+      return false;
+    }
+    trozo.totales[i] = static_cast<uint32_t>(valor);
+    p = fin + 1;
+  }
+  return true;
+}
+
+bool armarAckCancion(int32_t carga, bool ok, char* destino, size_t tamano) {
+  return cupo(snprintf(destino, tamano, "{\"carga\":%ld,\"ok\":%s}", static_cast<long>(carga),
+                       ok ? "true" : "false"),
+              tamano);
+}
+
+bool leerTecla(const char* json, char& tecla) {
+  char texto[2];
+  if (json == nullptr || !leerTexto(json, "tecla", texto, sizeof(texto)) || texto[0] == '\0' ||
+      strchr("123A456B789C*0#Dd", texto[0]) == nullptr) {
+    return false;
+  }
+  tecla = texto[0];
+  return true;
+}
+
+bool armarTecla(char tecla, char* destino, size_t tamano) {
+  return cupo(snprintf(destino, tamano, "{\"tecla\":\"%c\"}", tecla), tamano);
+}
+
 bool leerAviso(const char* json, bool& silenciar) {
   return json != nullptr && leerBooleano(json, "silenciar", silenciar);
 }

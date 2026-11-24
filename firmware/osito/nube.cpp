@@ -21,6 +21,11 @@ uint32_t ultima_publicacion_ms = 0;
 ColaCircular<contrato_mqtt::PedidoModo, config::PEDIDOS_MODO_MAX> pedidos;
 uint32_t arranque = 0;  // distinto en cada encendido
 bool inyectando_simulado = false;  // true mientras se procesa un "sim mqtt ..."
+ColaCircular<contrato_mqtt::TrozoCancion, config::TROZOS_CANCION_MAX> trozos;
+ColaCircular<char, config::TECLAS_REMOTAS_MAX> teclas_remotas;
+char panel[config::EVENTO_JSON_MAX] = {};
+bool hay_panel = false;
+uint32_t ultimo_panel_ms = 0;
 bool hay_aviso = false;
 bool aviso_silenciar = false;
 bool hay_volumen = false;
@@ -68,6 +73,17 @@ void alMensaje(const char* topico, const char* payload) {
     if (!pedidos.meter(pedido)) {
       Serial.println("[nube] Demasiados pedidos de modo juntos: se ignora uno");
     }
+  } else if (strcmp(topico, contrato_mqtt::TOPICO_CANCION) == 0) {
+    contrato_mqtt::TrozoCancion trozo;
+    // Uno inválido o que no cupo deja la carga incompleta: al final se responde que falló.
+    if (!contrato_mqtt::leerTrozoCancion(payload, trozo) || !trozos.meter(trozo)) {
+      Serial.println("[nube] Trozo de canción inválido o de más: se ignora");
+    }
+  } else if (strcmp(topico, contrato_mqtt::TOPICO_TECLA_REMOTA) == 0) {
+    char tecla = 0;
+    if (contrato_mqtt::leerTecla(payload, tecla)) {
+      teclas_remotas.meter(tecla);
+    }
   } else if (strcmp(topico, contrato_mqtt::TOPICO_AVISO) == 0) {
     if (contrato_mqtt::leerAviso(payload, aviso_silenciar)) {
       hay_aviso = true;
@@ -102,6 +118,14 @@ void publicarVolumen(uint32_t ahora_ms) {
   if (transporte->publicar(contrato_mqtt::TOPICO_VOLUMEN, json, true)) {
     hay_volumen = false;
     ultimo_volumen_ms = ahora_ms;
+  }
+}
+
+void publicarPanel(uint32_t ahora_ms) {
+  if (hay_panel && ahora_ms - ultimo_panel_ms >= config::PANEL_CADA_MS &&
+      transporte->publicar(contrato_mqtt::TOPICO_PANEL, panel, true)) {
+    hay_panel = false;
+    ultimo_panel_ms = ahora_ms;
   }
 }
 
@@ -183,11 +207,13 @@ void actualizar() {
   }
   estaba_conectado = conectado;
   if (!conectado) {
+    hay_panel = panel[0] != '\0';
     cola_publicada = false;  // al volver se publica enseguida cuántos esperan
     return;
   }
   publicarCola(ahora_ms);
   publicarVolumen(ahora_ms);
+  publicarPanel(ahora_ms);
 
   publicarEstados();
   uint32_t seq = 0;
@@ -274,6 +300,33 @@ bool sacarAviso(bool& silenciar) {
   hay_aviso = false;
   silenciar = aviso_silenciar;
   return true;
+}
+
+bool sacarTrozoCancion(contrato_mqtt::TrozoCancion& trozo) {
+  return trozos.sacar(trozo);
+}
+
+void responderCancion(int32_t carga, bool ok) {
+  char json[config::EVENTO_JSON_MAX];
+  contrato_mqtt::armarAckCancion(carga, ok, json, sizeof(json));
+  transporte->publicar(contrato_mqtt::TOPICO_CANCION_ACK, json, false);
+}
+
+bool sacarTeclaRemota(char& tecla) {
+  return teclas_remotas.sacar(tecla);
+}
+
+void alTecla(char tecla) {
+  char json[config::EVENTO_JSON_MAX];
+  contrato_mqtt::armarTecla(tecla, json, sizeof(json));
+  transporte->publicar(contrato_mqtt::TOPICO_TECLA, json, false);
+}
+
+void alPanel(const char* json) {
+  if (strcmp(json, panel) != 0) {
+    strncpy(panel, json, sizeof(panel) - 1);
+    hay_panel = true;
+  }
 }
 
 void inyectarSimulado(const char* topico, const char* payload) {

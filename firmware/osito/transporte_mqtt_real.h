@@ -42,7 +42,7 @@ class TransporteMqttReal : public TransporteMqtt {
  private:
   static constexpr size_t TOPICO_MAX = 48;
   static constexpr size_t SALIENTE_MAX = 320;  // JSON cifrado en Base64 + envoltura
-  static constexpr size_t ENTRANTE_MAX = 128;
+  static constexpr size_t ENTRANTE_MAX = config::ENTRANTE_MAX;
 
   struct Saliente {
     char topico[TOPICO_MAX];

@@ -12,6 +12,7 @@
 #include "estado_animales.h"
 #include "luces.h"
 #include "nube.h"
+#include "panel_json.h"
 #include "simulacion.h"
 #include "teclado_dj.h"
 #include "sintetizador_registro.h"
@@ -74,11 +75,42 @@ void atenderPedidosModo(uint32_t ahora_ms) {
     nube::responderModo(pedido.id, ok, director::modo(), pedido.simulado);
   }
 }
+
+// Canción creada en la página: se arma aparte y solo se puede elegir si llegó completa.
+void atenderCancion() {
+  contrato_mqtt::TrozoCancion trozo;
+  while (nube::sacarTrozoCancion(trozo)) {
+    bool ok = false;
+    switch (trozo.tipo) {
+      case contrato_mqtt::TrozoCancion::Tipo::Inicio:
+        ok = cancion_recibida::empezar(trozo.carga, trozo.nombre, trozo.pulso_ms,
+                                       director::cancionEnUso());
+        break;
+      case contrato_mqtt::TrozoCancion::Tipo::Pasos:
+        ok = cancion_recibida::agregar(trozo.carga, trozo.parte, trozo.desde, trozo.pasos);
+        break;
+      case contrato_mqtt::TrozoCancion::Tipo::Fin:
+        ok = cancion_recibida::terminar(trozo.carga, trozo.totales);
+        Serial.printf("[osito] Canción de la página: %s\n",
+                      ok ? "completa" : "incompleta, se descarta");
+        nube::responderCancion(trozo.carga, ok);
+        break;
+    }
+  }
+}
+
 // Teclado DJ: A/B/C escogen el modo; 1/2/3 silencian o devuelven a ranita/gatito/pollito.
 void atenderTeclado(uint32_t ahora_ms) {
   char tecla;
-  bool simulada = false;
-  while (teclado_dj::siguienteTecla(tecla, simulada)) {
+  teclado_dj::Origen origen = teclado_dj::Origen::Fisica;
+  while (nube::sacarTeclaRemota(tecla)) {
+    teclado_dj::meterRemota(tecla);
+  }
+  while (teclado_dj::siguienteTecla(tecla, origen)) {
+    const bool simulada = origen == teclado_dj::Origen::Simulada;
+    if (!simulada) {
+      nube::alTecla(tecla);  // la página la ilumina, venga del teclado o de la pantalla
+    }
     const acciones_dj::Accion accion = acciones_dj::deTecla(tecla, director::modo());
     switch (accion.tipo) {
       case acciones_dj::Tipo::CambiarModo:
@@ -240,7 +272,12 @@ void loop() {
     Serial.printf("[dj] loop listo: %u notas, ya se repite solo\n",
                   static_cast<unsigned>(notas_en_loop));
   }
+  atenderCancion();
   atenderPedidosModo(ahora_ms);
+  char panel[config::EVENTO_JSON_MAX];
+  if (panel_json::armar(director::panel(), panel, sizeof(panel))) {
+    nube::alPanel(panel);
+  }
   if (entradas::huboCambioVolumen()) {
     director::volumen(entradas::volumen());
     nube::alVolumen(entradas::volumen());

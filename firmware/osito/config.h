@@ -35,6 +35,11 @@ constexpr uint32_t FADE_MS = 150;  // "las partes entran y salen con fade corto"
 constexpr uint32_t FADE_CADA_MS = 10;
 constexpr uint8_t EXPRESION_PASO = 8;
 constexpr uint8_t VELOCIDAD_CANCION = 90;
+// Canciones que manda Node-RED (igual que nodered/arreglo.js).
+constexpr size_t CANCION_PASOS_MAX = 128;  // por parte
+constexpr unsigned long CANCION_PULSOS_MAX = 32;
+constexpr uint32_t CANCION_PULSO_MIN_MS = 120;
+constexpr uint32_t CANCION_PULSO_MAX_MS = 800;
 constexpr uint8_t VELOCIDAD_RANITA = 80;
 // Pollito en Libre/Simón: cuántas sacudidas llegan en VENTANA_SACUDIDAS_MS escoge el
 // instrumento (notas General MIDI, canal 10). No se usa la intensidad: el sensor de bolita
@@ -124,6 +129,11 @@ constexpr uint32_t ESPERA_WIFI_PARA_RADIO_MS = 15000;
 constexpr size_t BUFFER_MQTT_BYTES = 384;
 constexpr uint32_t VOLUMEN_CADA_MS = 500;      // el potenciómetro no inunda el broker
 constexpr uint32_t COLA_ESTADO_CADA_MS = 1000;
+constexpr uint32_t PANEL_CADA_MS = 200;
+constexpr uint8_t PANEL_AVANCE_PASO = 5;  // % : el avance solo se manda cada tanto
+constexpr size_t TECLAS_REMOTAS_MAX = 8;
+constexpr size_t TROZOS_CANCION_MAX = 24;
+constexpr size_t ENTRANTE_MAX = 256;
 // RAM: 64 x 160 B = 10 KB. Sin Wi-Fi, a ~2 eventos/s alcanza para ~30 s; lo demás se descarta
 // (el más viejo primero) hasta pasar la cola a LittleFS.
 constexpr size_t CAPACIDAD_COLA_MQTT = 64;

@@ -72,6 +72,14 @@ bool alternarAcordes() {
   return acordes_pedidos;
 }
 
+Ritmo ritmoPedido() {
+  return ritmo_pedido;
+}
+
+bool acordesPedidos() {
+  return acordes_pedidos;
+}
+
 bool encendido() {
   return ritmo != Ritmo::Apagado || acordes;
 }

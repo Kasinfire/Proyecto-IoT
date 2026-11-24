@@ -42,6 +42,10 @@ Un mensaje JSON por evento, ya descifrado:
 | `volumen` | `{"tipo":"volumen","nodo":"osito","valor":70}` | Potenciómetro del osito |
 | `modo` | `{"tipo":"modo","id":15,"ok":true,"modo":"simon","cancion":"Estrellita"}` | Respuesta del osito (`orquesta/control/modo/ack`), también si cambiaron el modo con su botón |
 | `simon` | `{"tipo":"simon","nodo":"ranita"}` y luego `{"tipo":"simon","nodo":"ranita","resultado":"acierto"}` | El osito pidió un animal; luego el resultado (`acierto`, `error` o `tiempo`) |
+| `panel` | `{"tipo":"panel","tempo":110,"eco":true,"ritmo":"pop","acordes":false,"loop":"sonando","capas":2,"callados":["pollito"],"nivel":3}` | Cambia algo del teclado DJ (`orquesta/osito/panel`) |
+| `tecla` | `{"tipo":"tecla","tecla":"8"}` | Se apretó una tecla, real o en pantalla |
+| `canciones` | `{"tipo":"canciones"}` | Cambió la lista: volver a pedirla |
+| `grabacion` | `{"tipo":"grabacion","activa":true,"notas":5}` | Avance de la grabación del gatito |
 | `cancion` | `{"tipo":"cancion","progreso":0.4}` | Avance de la canción, 0 a 1 (opcional) |
 | `red` | `{"tipo":"red","internet":false,"pendientes":37}` y al volver `{"tipo":"red","internet":true,"pendientes":0,"recuperados":37,"guardado":1795470500000}` | Estado del internet y del buffer del osito |
 
@@ -54,6 +58,10 @@ Un mensaje JSON por evento, ya descifrado:
 | `POST /api/sesion/iniciar` | `{"alias":"A-07"}` | `204` | Abre la sesión con ese niño (una a la vez) |
 | `POST /api/sesion/terminar` | `{"nota":"…"}` | `204` | Cierra la sesión y la guarda en Supabase |
 | `GET /api/sesion/actual` | — | `{"alias":"A-07","inicio":…}` o `null` | |
+| `POST /api/tecla` | `{"tecla":"8"}` | `204` | Como apretarla en el teclado del osito (`d` = D mantenida) |
+| `POST /api/canciones`, `…/editar`, `…/borrar` | canción, o `{"id":…}` al borrar | `{"id":…}` o `204` | Solo las propias; las incluidas se duplican |
+| `POST /api/canciones/arreglar` | canción | `{"partes":…,"pulso_ms":…}` | Las cuatro partes, para oírla antes de guardar |
+| `POST /api/canciones/grabar` | `{"accion":"empezar"}`, `terminar` o `cancelar` | `204` o `{"melodia":…}` | Graba el gatito en Libre |
 | `GET /api/canciones` | — | `[{"nombre":"Estrellita","tipo":"tranquilas","duracion":"1:20"}]` | `tipo`: `tranquilas`, `alegres`, `navidad` o `cumpleanos` |
 | `GET /api/ninos` | — | `[{"alias":"A-07","sesiones":6,"simon_pct":75,"favorito":"gatito","en_sesion":true}]` | |
 | `POST /api/ninos` | `{"alias":"D-04","nombre":"…"}` | `{"alias":"D-04"}` | Basta uno de los dos; sin alias se pone el siguiente libre. El nombre se queda en la laptop |

@@ -455,11 +455,14 @@
       ],
       [
         "orq_espera"
+      ],
+      [
+        "orq_out"
       ]
     ],
     "name": "API",
-    "func": "const metodo = msg.req.method;\n// Otro sitio abierto en el navegador no puede mandar JSON aquí sin permiso.\nif (metodo === 'POST' && !msg.req.is('application/json')) {\n  msg.statusCode = 415;\n  msg.payload = { error: 'se espera JSON' };\n  return [msg, null, null];\n}\nconst r = global.get('orquesta').alHttp(metodo, msg.req.path.replace('/api/', ''), msg.payload);\nmsg.statusCode = r.codigo;\nmsg.headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };\nmsg.payload = r.codigo === 204 ? '' : JSON.stringify(r.cuerpo);\nnode.send([msg, null, null]);\nfor (const m of r.ws) node.send([null, { payload: JSON.stringify(m) }, null]);\nfor (const m of r.mqtt) node.send([null, null, { topic: m.topic, payload: m.payload }]);\nreturn null;",
-    "outputs": 3,
+    "func": "const metodo = msg.req.method;\n// Otro sitio abierto en el navegador no puede mandar JSON aquí sin permiso.\nif (metodo === 'POST' && !msg.req.is('application/json')) {\n  msg.statusCode = 415;\n  msg.payload = { error: 'se espera JSON' };\n  return [msg, null, null];\n}\nconst r = global.get('orquesta').alHttp(metodo, msg.req.path.replace('/api/', ''), msg.payload);\nmsg.statusCode = r.codigo;\nmsg.headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };\nmsg.payload = r.codigo === 204 ? '' : JSON.stringify(r.cuerpo);\nnode.send([msg, null, null]);\nfor (const m of r.ws) node.send([null, { payload: JSON.stringify(m) }, null]);\n// Una tecla sale de inmediato; un modo espera a que la pantalla conozca su id.\nfor (const m of r.mqtt) {\n  const pub = { topic: m.topic, payload: m.payload };\n  node.send(r.urgente ? [null, null, null, pub] : [null, null, pub, null]);\n}\nreturn null;",
+    "outputs": 4,
     "timeout": 0,
     "noerr": 0,
     "initialize": "",
@@ -532,6 +535,171 @@
     ],
     "name": "",
     "url": "/api/ninos/borrar",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_in10",
+    "type": "mqtt in",
+    "z": "orq_flujo",
+    "x": 360,
+    "y": 20,
+    "wires": [
+      [
+        "orq_recibir"
+      ]
+    ],
+    "name": "",
+    "topic": "orquesta/osito/panel",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "orq_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0
+  },
+  {
+    "id": "orq_in11",
+    "type": "mqtt in",
+    "z": "orq_flujo",
+    "x": 360,
+    "y": 40,
+    "wires": [
+      [
+        "orq_recibir"
+      ]
+    ],
+    "name": "",
+    "topic": "orquesta/osito/tecla",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "orq_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0
+  },
+  {
+    "id": "orq_in12",
+    "type": "mqtt in",
+    "z": "orq_flujo",
+    "x": 360,
+    "y": 60,
+    "wires": [
+      [
+        "orq_recibir"
+      ]
+    ],
+    "name": "",
+    "topic": "orquesta/control/cancion/ack",
+    "qos": "0",
+    "datatype": "utf8",
+    "broker": "orq_broker",
+    "nl": false,
+    "rap": true,
+    "rh": 0,
+    "inputs": 0
+  },
+  {
+    "id": "orq_http30",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 1100,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/canciones",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http31",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 1145,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/canciones/editar",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http32",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 1190,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/canciones/borrar",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http33",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 1235,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/canciones/arreglar",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http34",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 1280,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/canciones/grabar",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": ""
+  },
+  {
+    "id": "orq_http35",
+    "type": "http in",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 1325,
+    "wires": [
+      [
+        "orq_api"
+      ]
+    ],
+    "name": "",
+    "url": "/api/tecla",
     "method": "post",
     "upload": false,
     "swaggerDoc": ""

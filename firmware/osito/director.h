@@ -17,7 +17,23 @@
 #include "sintetizador.h"
 
 namespace director {
-void iniciar(Sintetizador& sintetizador, uint32_t semilla, uint32_t ahora_ms);
+enum class EstadoLoop : uint8_t { Vacio, Grabando, Sonando, Parado };
+
+// Lo que muestra el panel de la página.
+struct Panel {
+  uint8_t tempo;
+  bool eco;
+  acompanamiento::Ritmo ritmo;
+  bool acordes;
+  EstadoLoop loop;
+  uint8_t capas;
+  uint8_t callados;  // un bit por Nodo
+  uint8_t nivel;     // de Simón
+  uint8_t avance;    // de la canción, 0..100
+};
+
+void iniciar(Sintetizador& sintetizador, uint32_t semilla, uint32_t ahora_ms,
+             const char* cancion_inicial = canciones::INICIAL);
 void actualizar(uint32_t ahora_ms);
 
 void cambiarModo(protocolo::Modo modo, uint32_t ahora_ms);
@@ -26,6 +42,8 @@ protocolo::Modo modo();
 // false si no existe esa canción (en ese caso no cambia nada).
 bool elegirCancion(const char* nombre);
 const char* cancion();
+const canciones::Cancion* cancionEnUso();
+Panel panel();
 
 void alEvento(const interprete::Evento& evento, uint32_t ahora_ms);
 // Teclado DJ: devuelve true si el animal quedó silenciado. El osito no se puede silenciar.

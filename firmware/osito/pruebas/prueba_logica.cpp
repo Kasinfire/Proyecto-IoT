@@ -4,6 +4,8 @@
 #include <cstring>
 
 #include "acciones_dj.h"
+#include "cancion_recibida.h"
+#include "panel_json.h"
 #include "cola_eventos.h"
 #include "config.h"
 #include "contrato_mqtt.h"
@@ -265,7 +267,7 @@ void pruebasCancion() {
   estado_animales::reiniciar();
   SintetizadorFalso s;
   uint32_t t = 1000;
-  director::iniciar(s, 7, t);
+  director::iniciar(s, 7, t, "prueba");
   correr(t, 4000);
   revisar("cancion: la base del osito suena sola", s.on[C_OSITO] >= 3 && s.on[C_RANITA] == 0);
   revisar("cancion: la base termina a expresion maxima", s.exp[C_OSITO] == 127);
@@ -314,7 +316,8 @@ void pruebasCancion() {
   correr(t, t + 1000, pollito);
   revisar("cancion: agitado seguido, el pollito suma el pio al ritmo", s.pios >= 1);
 
-  revisar("cancion: \"estrellita\" no existe todavia", !director::elegirCancion("estrellita"));
+  revisar("cancion: una que no existe se rechaza", !director::elegirCancion("no-existe"));
+  revisar("cancion: \"estrellita\" si existe", director::elegirCancion("estrellita"));
   revisar("cancion: \"prueba\" si existe", director::elegirCancion("prueba"));
 }
 
@@ -323,7 +326,7 @@ void pruebasLibre() {
   estado_animales::reiniciar();
   SintetizadorFalso s;
   uint32_t t = 1000;
-  director::iniciar(s, 7, t);
+  director::iniciar(s, 7, t, "prueba");
   director::cambiarModo(protocolo::Modo::Libre, t);
   s.limpiar();
   correr(t, 3000);
@@ -427,7 +430,7 @@ void pruebasSimon() {
   estado_animales::reiniciar();
   SintetizadorFalso s;
   uint32_t t = 1000;
-  director::iniciar(s, 12345, t);
+  director::iniciar(s, 12345, t, "prueba");
   director::cambiarModo(protocolo::Modo::Simon, t);
   protocolo::PayloadLuz luz;
   simon::Resultado resultado;
@@ -545,7 +548,7 @@ void pruebasSimonGestos() {
     estado_animales::reiniciar();
     SintetizadorFalso s;
     uint32_t t = 1000;
-    director::iniciar(s, 5, t);
+    director::iniciar(s, 5, t, "prueba");
     director::cambiarModo(protocolo::Modo::Simon, t);
     const int vivo = protocolo::aEntero(Nodo::Ranita);
     // La ranita queda tapada desde antes y repite su nivel cada 500 ms.
@@ -570,7 +573,7 @@ void pruebasSimonGestos() {
     estado_animales::reiniciar();
     SintetizadorFalso s;
     uint32_t t = 1000;
-    director::iniciar(s, 5, t);
+    director::iniciar(s, 5, t, "prueba");
     director::cambiarModo(protocolo::Modo::Simon, t);
     const int vivo = protocolo::aEntero(Nodo::Pollito);
     esperarTurno(t, vivo, luces);
@@ -666,7 +669,7 @@ void pruebasDj() {
   estado_animales::reiniciar();
   SintetizadorFalso s;
   uint32_t t = 1000;
-  director::iniciar(s, 7, t);
+  director::iniciar(s, 7, t, "prueba");
   director::cambiarModo(protocolo::Modo::Libre, t);
   revisar("dj: el osito no se silencia", !director::alternarSilencio(Nodo::Osito));
   director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 90), t);
@@ -700,7 +703,7 @@ void pruebasLooper() {
   estado_animales::reiniciar();
   SintetizadorFalso s;
   uint32_t t = 1000;
-  director::iniciar(s, 7, t);
+  director::iniciar(s, 7, t, "prueba");
   director::cambiarModo(protocolo::Modo::Libre, t);
   s.limpiar();
   const uint32_t pulso = 250;  // "prueba" con tempo normal
@@ -761,7 +764,7 @@ void pruebasLooperCancelar() {
   estado_animales::reiniciar();
   SintetizadorFalso s;
   uint32_t t = 1000;
-  director::iniciar(s, 7, t);
+  director::iniciar(s, 7, t, "prueba");
   director::cambiarModo(protocolo::Modo::Libre, t);
   director::grabarLoop();
   correr(t, t + 600);
@@ -776,7 +779,7 @@ void pruebasEfectos() {
   estado_animales::reiniciar();
   SintetizadorFalso s;
   uint32_t t = 1000;
-  director::iniciar(s, 7, t);
+  director::iniciar(s, 7, t, "prueba");
   director::cambiarModo(protocolo::Modo::Libre, t);
   s.limpiar();
   const uint32_t pulso = 250;
@@ -818,7 +821,7 @@ void pruebasDeshacer() {
   estado_animales::reiniciar();
   SintetizadorFalso s;
   uint32_t t = 1000;
-  director::iniciar(s, 7, t);
+  director::iniciar(s, 7, t, "prueba");
   director::cambiarModo(protocolo::Modo::Libre, t);
   const uint32_t vuelta = 250 * 16;
   revisar("deshacer: sin loop no hay nada que quitar", !director::deshacerLoop());
@@ -851,7 +854,7 @@ void pruebasBanda() {
   estado_animales::reiniciar();
   SintetizadorFalso s;
   uint32_t t = 1000;
-  director::iniciar(s, 7, t);
+  director::iniciar(s, 7, t, "prueba");
   director::cambiarModo(protocolo::Modo::Libre, t);
   s.limpiar();
   correr(t, t + 3 * 250 + 10);  // tres pulsos dentro del compás
@@ -897,7 +900,7 @@ void pruebasTempo() {
   estado_animales::reiniciar();
   SintetizadorFalso s;
   uint32_t t = 1000;
-  director::iniciar(s, 7, t);
+  director::iniciar(s, 7, t, "prueba");
   correr(t, t + 4000);
   const int normal = s.on[C_OSITO];
   revisar("tempo: empieza en 100%", director::tempo() == 100);
@@ -912,6 +915,142 @@ void pruebasTempo() {
     director::cambiarTempo(-10);
   }
   revisar("tempo: no baja de 50%", director::tempo() == 50);
+}
+
+void pruebasCancionRecibida() {
+  namespace cr = cancion_recibida;
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t);
+  revisar("recibida: al arrancar esta estrellita", strcmp(director::cancion(), "estrellita") == 0);
+  const uint32_t unos[] = {1, 1, 2, 1};
+  const auto cargar = [&](int32_t carga, const char* nombre, const char* melodia,
+                          const uint32_t(&totales)[4]) {
+    return cr::empezar(carga, nombre, 250, director::cancionEnUso()) &&
+           cr::agregar(carga, 0, 0, "48.4.0") && cr::agregar(carga, 1, 0, "64.4.0") &&
+           cr::agregar(carga, 2, 0, melodia) && cr::agregar(carga, 3, 0, "70.1.110") &&
+           cr::terminar(carga, totales);
+  };
+  revisar("recibida: completa se puede elegir", cargar(1, "m-uno", "60.2.0,62.2.0", unos) &&
+                                                    director::elegirCancion("m-uno"));
+  s.limpiar();
+  correr(t, t + 1200);
+  revisar("recibida: y suena su base", s.on[C_OSITO] >= 1 && s.ultima_on[C_OSITO] == 48);
+
+  revisar("recibida: totales que no cuadran se descartan", [&] {
+    const uint32_t mas[] = {1, 1, 3, 1};
+    return !cargar(2, "m-dos", "60.2.0,62.2.0", mas) && !director::elegirCancion("m-dos");
+  }());
+  revisar("recibida: sigue sonando la anterior", strcmp(director::cancion(), "m-uno") == 0);
+  cr::empezar(3, "m-tres", 250, director::cancionEnUso());
+  revisar("recibida: trozo perdido se descarta", cr::agregar(3, 2, 0, "60.2.0") &&
+                                                     !cr::agregar(3, 2, 5, "60.2.0") &&
+                                                     !cr::agregar(3, 0, 0, "48.4.0"));
+  cr::empezar(4, "m-cuatro", 250, director::cancionEnUso());
+  revisar("recibida: repetido se ignora, de otra carga no entra",
+          cr::agregar(4, 2, 0, "60.2.0") && cr::agregar(4, 2, 0, "60.2.0") &&
+              !cr::agregar(99, 0, 0, "48.4.0") && cr::agregar(4, 0, 0, "48.4.0") &&
+              cr::agregar(4, 1, 0, "64.4.0") && cr::agregar(4, 2, 1, "62.2.0") &&
+              cr::agregar(4, 3, 0, "70.1.1") && cr::terminar(4, unos));
+  bool todos_rechazados = true;
+  for (const char* malo : {"", "x", "60", "60.2", "60.2.", "60.0.0", "60.33.0", "128.1.0", "60.1.128",
+                           "60.2.0,", "60.2.0;61.2.0", "-1.2.0", "60.2.0 ", "999999999999.1.1"}) {
+    cr::empezar(5, "m-cinco", 250, director::cancionEnUso());
+    todos_rechazados = todos_rechazados && !cr::agregar(5, 2, 0, malo);
+  }
+  revisar("recibida: pasos mal formados se rechazan", todos_rechazados);
+  revisar("recibida: nombres y pulsos fuera de lugar se rechazan",
+          !cr::empezar(6, "", 250, nullptr) && !cr::empezar(6, "Con Espacio", 250, nullptr) &&
+              !cr::empezar(6, "m-demasiado-largo-para-24", 250, nullptr) &&
+              !cr::empezar(6, "m-x", 10, nullptr) && !cr::empezar(6, "m-x", 5000, nullptr));
+  cr::empezar(7, "m-siete", 250, director::cancionEnUso());
+  bool cabe = true;
+  for (uint32_t i = 0; i < config::CANCION_PASOS_MAX; ++i) {
+    cabe = cabe && cr::agregar(7, 2, i, "60.1.0");
+  }
+  revisar("recibida: caben 128 pasos y ni uno mas",
+          cabe && !cr::agregar(7, 2, config::CANCION_PASOS_MAX, "60.1.0"));
+
+  // Varias seguidas sin elegirlas: nunca se escribe sobre la que suena.
+  const canciones::Cancion* sonando = director::cancionEnUso();
+  for (int32_t c = 10; c < 14; ++c) {
+    cargar(c, "m-otra", "72.2.0,74.2.0", unos);
+  }
+  revisar("recibida: la que suena no cambia", director::cancionEnUso() == sonando &&
+                                                  strcmp(director::cancion(), "m-uno") == 0 &&
+                                                  sonando->partes[2].pasos[0].nota_midi == 60);
+  cargar(20, "m-uno", "65.2.0,67.2.0", unos);
+  revisar("recibida: editada, al elegirla entra la nueva",
+          director::elegirCancion("m-uno") &&
+              director::cancionEnUso()->partes[2].pasos[0].nota_midi == 65);
+
+  contrato_mqtt::TrozoCancion trozo;
+  using Tipo = contrato_mqtt::TrozoCancion::Tipo;
+  revisar("recibida: lee inicio, pasos y fin",
+          contrato_mqtt::leerTrozoCancion("{\"carga\":5,\"nombre\":\"m-a\",\"pulso\":250}", trozo) &&
+              trozo.tipo == Tipo::Inicio && trozo.pulso_ms == 250 &&
+              contrato_mqtt::leerTrozoCancion(
+                  "{\"carga\":5,\"parte\":2,\"desde\":8,\"pasos\":\"60.2.0\"}", trozo) &&
+              trozo.tipo == Tipo::Pasos && trozo.parte == 2 && trozo.desde == 8 &&
+              contrato_mqtt::leerTrozoCancion("{\"carga\":5,\"totales\":\"1,2,3,4\"}", trozo) &&
+              trozo.tipo == Tipo::Fin && trozo.totales[3] == 4);
+  bool rechaza = true;
+  for (const char* malo : {"{}", "{\"carga\":0,\"totales\":\"1,2,3,4\"}", "{\"carga\":5}",
+                           "{\"carga\":5,\"totales\":\"1,2,3\"}", "{\"carga\":5,\"totales\":\"1,2,3,4,5\"}",
+                           "{\"carga\":5,\"parte\":4,\"desde\":0,\"pasos\":\"60.2.0\"}",
+                           "{\"carga\":5,\"nombre\":\"m-a\"}"}) {
+    rechaza = rechaza && !contrato_mqtt::leerTrozoCancion(malo, trozo);
+  }
+  revisar("recibida: trozos invalidos se rechazan", rechaza);
+}
+
+void pruebasPanel() {
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t, "prueba");
+  char json[config::EVENTO_JSON_MAX];
+  revisar("panel: estado inicial",
+          panel_json::armar(director::panel(), json, sizeof(json)) &&
+              strcmp(json, "{\"tempo\":100,\"eco\":false,\"ritmo\":\"apagado\",\"acordes\":false,"
+                           "\"loop\":\"vacio\",\"capas\":0,\"callados\":0,\"nivel\":1,\"avance\":0}") == 0);
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  director::alternarEco();
+  director::siguienteRitmo();
+  director::alternarSilencio(Nodo::Pollito);
+  director::cambiarTempo(10);
+  director::grabarLoop();
+  director::alEvento(gesto(Nodo::Gatito, interprete::Clase::Nota, 2, 90), t);
+  panel_json::armar(director::panel(), json, sizeof(json));
+  revisar("panel: refleja eco, ritmo, tempo, callados y grabacion",
+          strstr(json, "\"tempo\":110,\"eco\":true,\"ritmo\":\"tranquilo\"") != nullptr &&
+              strstr(json, "\"loop\":\"grabando\",\"capas\":1,\"callados\":8") != nullptr);
+  director::Panel largo = {200, true, acompanamiento::Ritmo::Tranquilo, true,
+                           director::EstadoLoop::Grabando, 255, 255, 255, 100};
+  revisar("panel: el mas largo cabe", panel_json::armar(largo, json, sizeof(json)));
+  director::cambiarModo(protocolo::Modo::Cancion, t);
+  correr(t, t + 800);
+  const uint8_t mitad = director::panel().avance;
+  revisar("panel: avance de la cancion", mitad <= 100);
+  char tecla = 0;
+  revisar("panel: teclas validas", contrato_mqtt::leerTecla("{\"tecla\":\"#\"}", tecla) &&
+                                       tecla == '#' &&
+                                       contrato_mqtt::leerTecla("{\"tecla\":\"d\"}", tecla));
+  revisar("panel: teclas invalidas se rechazan", !contrato_mqtt::leerTecla("{\"tecla\":\"z\"}", tecla) &&
+                                                     !contrato_mqtt::leerTecla("{\"tecla\":\"\"}", tecla) &&
+                                                     !contrato_mqtt::leerTecla("{\"tecla\":\"12\"}", tecla) &&
+                                                     !contrato_mqtt::leerTecla("{}", tecla));
+  // Todas las incluidas: existen, duran algo y sus partes suenan.
+  bool todas = true;
+  for (const canciones::Cancion& c : canciones::INCLUIDAS) {
+    todas = todas && director::elegirCancion(c.nombre);
+    s.limpiar();
+    correr(t, t + 6000);
+    todas = todas && s.on[C_OSITO] > 0;
+  }
+  revisar("canciones: las 13 incluidas se eligen y suenan",
+          todas && std::size(canciones::INCLUIDAS) == 13);
 }
 
 void pruebasContratoMqtt() {
@@ -1051,6 +1190,8 @@ int main() {
   pruebasTempo();
   pruebasEfectos();
   pruebasDeshacer();
+  pruebasCancionRecibida();
+  pruebasPanel();
   pruebasBanda();
   pruebasContratoMqtt();
   pruebasColaEventos();

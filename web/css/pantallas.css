@@ -644,3 +644,131 @@
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* ---------- Panel DJ ---------- */
+
+.panel-dj {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.tecla {
+  min-height: 84px;
+  padding: 10px 12px;
+  border: 2px solid transparent;
+  border-radius: var(--radio);
+  background: var(--relleno);
+  color: var(--tinta);
+  font: inherit;
+  text-align: left;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+  align-items: center;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.tecla:hover:not(:disabled) { background: var(--relleno-encima); }
+.tecla:disabled { cursor: default; color: var(--tinta-tenue); }
+.tecla--encendida { background: var(--lima); border-color: var(--tinta); }
+.tecla--encendida:hover:not(:disabled) { background: var(--lima-encima); }
+.tecla--apretada { outline: 4px solid var(--violeta); transform: scale(0.97); }
+.tecla__simbolo {
+  grid-row: span 2;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #ffffff;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  font-weight: 800;
+}
+.tecla__texto { font-size: 15px; font-weight: 800; overflow-wrap: anywhere; }
+.tecla__estado { grid-column: 2; font-size: 13px; font-weight: 600; min-height: 1.2em; }
+.panel-dj__pie { margin-top: 10px; min-height: 44px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.panel-dj__error { color: var(--alerta-texto); font-weight: 700; }
+
+@media (max-width: 640px) {
+  .panel-dj { gap: 6px; }
+  .tecla { grid-template-columns: 1fr; padding: 8px; min-height: 96px; align-content: start; }
+  .tecla__simbolo { grid-row: auto; width: 26px; height: 26px; font-size: 13px; }
+  .tecla__texto { font-size: 12px; }
+  .tecla__estado { grid-column: 1; font-size: 12px; }
+}
+
+/* ---------- Canciones: acciones y editor ---------- */
+
+.cancion--bloques { background: var(--osito-claro); }
+.cancion--mias { background: var(--lila); }
+.cancion-caja { display: flex; flex-direction: column; gap: 4px; }
+.cancion-caja .cancion { flex: 1; width: 100%; }
+.cancion-caja__acciones { display: flex; flex-wrap: wrap; gap: 4px; }
+.cancion-caja__accion {
+  min-height: var(--objetivo-min);
+  padding: 0 12px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--tinta);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.cancion-caja__accion:hover { background: var(--relleno-encima); }
+.ventana--ancha { width: min(860px, 94vw); }
+.editor__fila { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.editor__fila .campo { flex: 1 1 150px; min-width: 0; }
+.editor__fila input, .editor__fila select { width: 100%; min-height: var(--objetivo-min); }
+.editor__etiqueta { font-size: 15px; font-weight: 700; }
+.editor__melodia {
+  min-height: 72px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 10px;
+  border-radius: var(--radio-chico);
+  background: var(--superficie);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-content: flex-start;
+}
+.ficha {
+  min-height: var(--objetivo-min);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: var(--gatito-claro);
+  color: var(--tinta);
+  font: inherit;
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.ficha--silencio { background: var(--relleno-encima); }
+.ficha[aria-pressed="true"] { border-color: var(--tinta); background: var(--lima); }
+.ficha small { font-size: 12px; }
+.editor__notas { display: grid; grid-template-columns: repeat(auto-fit, minmax(72px, 1fr)); gap: 6px; }
+.nota-boton {
+  min-height: 52px;
+  border: none;
+  border-radius: 14px;
+  background: var(--violeta);
+  color: #ffffff;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+.nota-boton--silencio { background: var(--relleno-encima); color: var(--tinta); }
+.grabar__cuenta { font-size: 28px; font-weight: 800; }
+.nino__inicial { font-size: 28px; font-weight: 800; }
+.sesion__nota { flex-basis: 100%; grid-column: 1 / -1; font-size: 14px; overflow-wrap: anywhere; }
+.sesion:has(.sesion__nota) { max-height: none; }
+
+@media (max-width: 720px) {
+  .sesion { grid-template-columns: 56px minmax(0, 1fr); max-height: none; }
+  .sesion__aviso { grid-column: 1 / -1; }
+}

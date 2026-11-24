@@ -69,6 +69,45 @@ export function obtenerCanciones() {
   return pedir('/api/canciones');
 }
 
+export function guardarCancion(cancion) {
+  if (esEnsayo()) {
+    const ficha = { ...cancion, id: cancion.id ?? `m-${Date.now()}`, duracion: '0:10', incluida: false };
+    const i = ensayo.CANCIONES.findIndex((c) => c.id && c.id === cancion.id);
+    if (i >= 0) ensayo.CANCIONES[i] = ficha;
+    else ensayo.CANCIONES.push(ficha);
+    return Promise.resolve({ id: ficha.id });
+  }
+  return enviar(cancion.id ? '/api/canciones/editar' : '/api/canciones', cancion);
+}
+
+export function borrarCancion(id) {
+  if (esEnsayo()) {
+    ensayo.CANCIONES.splice(ensayo.CANCIONES.findIndex((c) => c.id === id), 1);
+    return Promise.resolve(null);
+  }
+  return enviar('/api/canciones/borrar', { id });
+}
+
+// Las cuatro partes de la canción, para oírla. En ensayo solo la melodía.
+export function arreglarCancion(cancion) {
+  if (esEnsayo()) return Promise.resolve({ partes: { gatito: cancion.melodia }, pulso_ms: cancion.pulso_ms });
+  return enviar('/api/canciones/arreglar', cancion);
+}
+
+// accion: 'empezar' | 'terminar' (devuelve la melodía) | 'cancelar'
+export function grabarGatito(accion) {
+  if (esEnsayo()) return Promise.resolve(accion === 'terminar' ? { melodia: [[60, 2], [62, 2], [64, 4]], pulso_ms: 250 } : null);
+  return enviar('/api/canciones/grabar', { accion });
+}
+
+export function tocarTecla(tecla) {
+  if (esEnsayo()) {
+    simulador()?.tocarTecla(tecla);
+    return Promise.resolve(null);
+  }
+  return enviar('/api/tecla', { tecla });
+}
+
 export function obtenerNinos() {
   if (esEnsayo()) return Promise.resolve(ensayo.NINOS);
   return pedir('/api/ninos');

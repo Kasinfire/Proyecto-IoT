@@ -24,6 +24,7 @@ function pintarSesiones(sesiones, alias) {
         el('p', { class: 'texto-ayuda' }, `${s.minutos} min · ${s.cancion}`)),
       el('div', { class: 'sesion__dato' }, el('small', {}, 'Gestos'), el('strong', {}, String(s.gestos))),
       el('div', { class: 'sesion__dato' }, el('small', {}, 'Simón Dice'), el('strong', {}, s.simon ? `${s.simon[0]} de ${s.simon[1]}` : '—')),
+      s.nota ? el('p', { class: 'sesion__nota' }, el('strong', {}, 'Nota: '), s.nota) : null,
       el('p', { class: `sesion__aviso${s.aviso ? ' sesion__aviso--hay' : ''}` }, s.aviso ?? 'Sin avisos'));
   }));
 }

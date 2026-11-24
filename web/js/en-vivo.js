@@ -4,11 +4,12 @@
 import { ANIMALES, cara, cuadroCara } from './caritas.js';
 import { el, icono, palomita, haceCuanto, iniciarPagina } from './comun.js';
 import { conectar, esEnsayo, simulador } from './conexion.js';
+import { crearPanel } from './panel.js';
 import { explicar, obtenerCanciones, obtenerNinos, pedirModo, silenciarAviso, terminarSesion } from './api.js';
 
 const ACTIVO_MS = 2000;           // un animal está "tocando" si tuvo un gesto hace menos de esto
 const CELDAS = 20;                // segundos que muestra la partitura
-const ESPERA_ACK_MS = 5000;       // si el osito no confirma en este tiempo, se avisa
+const ESPERA_ACK_MS = 8000;       // si el osito no confirma en este tiempo, se avisa
 const RECUPERADO_VISIBLE_MS = 6000;
 const MINIMO_JUNTOS = 3;          // "tocando juntos" = 3 o más animales a la vez
 
@@ -103,6 +104,18 @@ function alEvento(msg) {
       a.detalle = { texto: `Sacudida de ${msg.intensidad} %` };
       marcarGesto('pollito');
       break;
+    case 'panel':
+      panel.actualizar(msg);
+      return;
+    case 'tecla':
+      panel.destellar(msg.tecla);
+      return;
+    case 'canciones':
+      cargarCanciones();
+      return;
+    case 'cancion':
+    case 'grabacion':
+      return;
     case 'volumen':
       estado.animales.osito.detalle = { texto: `Volumen ${msg.valor} %` };
       break;
@@ -268,6 +281,7 @@ function pintarAlerta() {
 }
 
 function pintarModos() {
+  panel.modo(estado.modo);
   $('modos').replaceChildren(...MODOS.map(({ id, nombre }) => {
     const elegido = estado.pendiente ? estado.pendiente.modo === id : estado.modo === id;
     let sello = null;
@@ -291,6 +305,7 @@ function pintarCancionElegida() {
 
 let claveConexion = '';
 function pintarConexion() {
+  panel.conexion(estado.ws === 'ensayo' || (estado.ws === 'conectado' && estado.internet && estado.animales.osito.conectado === true));
   const ahora = Date.now();
   let tipo;
   let valor;
@@ -303,15 +318,15 @@ function pintarConexion() {
     ayuda = 'Reintentando… la música del osito no se detiene';
   } else if (!estado.internet) {
     tipo = 'aviso'; sinRed = true;
-    valor = `Sin internet · el osito guarda ${estado.pendientesOsito} eventos`;
-    ayuda = 'La música sigue sonando; se mandan solos al volver la conexión';
+    valor = 'El osito no está conectado';
+    ayuda = `La música sigue sonando. Guarda hasta 64 eventos y los manda al volver (tenía ${estado.pendientesOsito}).`;
   } else if (ahora < estado.recuperadoHasta) {
     tipo = 'bien';
-    valor = `De vuelta · llegaron los ${estado.recuperados} eventos`;
-    ayuda = 'No se perdió nada de la sesión';
+    valor = 'El osito está de vuelta';
+    ayuda = `Traía ${estado.recuperados} eventos guardados`;
   } else {
     tipo = 'bien';
-    valor = 'Internet y osito en línea';
+    valor = 'Broker y osito en línea';
     ayuda = `${estado.pendientesOsito} eventos pendientes${estado.guardado ? ` · guardado ${haceCuanto(ahora - estado.guardado)}` : ''}`;
   }
 
@@ -442,6 +457,7 @@ function prepararAcciones() {
 
 // ---------- Arranque ----------
 
+const panel = crearPanel($('panel'));
 iniciarPagina();
 prepararAcciones();
 cargarCanciones();

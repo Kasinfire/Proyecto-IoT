@@ -22,6 +22,9 @@ export const CANCIONES = [
   { nombre: 'Cumpleaños feliz', tipo: 'cumpleanos', duracion: '0:40' },
 ];
 
+// En ensayo todas cuentan como incluidas.
+CANCIONES.forEach((c, i) => Object.assign(c, { id: `e-${i}`, incluida: true, estilo: 'marcha', compas: 8, pulso_ms: 250, melodia: MELODIA.map((n) => [{ do: 60, re: 62, mi: 64, fa: 65, sol: 67, la: 69 }[n], 2]) }));
+
 export const NINOS = [
   { alias: 'A-07', sesiones: 6, simon_pct: 75, favorito: 'gatito', en_sesion: true },
   { alias: 'B-12', sesiones: 4, simon_pct: 60, favorito: 'ranita', en_sesion: false },
@@ -76,6 +79,8 @@ export function iniciarSimulacion(emitir) {
   Object.keys(conectados).forEach((nodo) => emitir({ tipo: 'estado', nodo, conectado: true }));
   emitir({ tipo: 'red', internet: true, pendientes: 0, guardado: Date.now() });
   emitir({ tipo: 'volumen', nodo: 'osito', valor: 70 });
+  const panel = { tipo: 'panel', tempo: 100, eco: false, ritmo: 'apagado', acordes: false, loop: 'vacio', capas: 0, callados: [], nivel: 1 };
+  emitir({ ...panel });
 
   // A los 6 s el pollito "se apaga", para ver la alerta, y a los 15 s vuelve y la alerta se quita sola.
   setTimeout(() => {
@@ -135,6 +140,20 @@ export function iniciarSimulacion(emitir) {
       } else {
         emitir({ tipo: 'red', internet: true, pendientes: 0, recuperados: pendientes, guardado: Date.now() });
       }
+    },
+    tocarTecla(tecla) {
+      const cambios = {
+        4: () => { panel.eco = !panel.eco; }, 0: () => { panel.acordes = !panel.acordes; },
+        7: () => { panel.tempo = Math.max(50, panel.tempo - 10); }, 9: () => { panel.tempo = Math.min(200, panel.tempo + 10); },
+        8: () => { const r = ['apagado', 'tranquilo', 'pop', 'cumbia']; panel.ritmo = r[(r.indexOf(panel.ritmo) + 1) % 4]; },
+      };
+      cambios[tecla]?.();
+      const animal = { 1: 'ranita', 2: 'gatito', 3: 'pollito' }[tecla];
+      if (animal) panel.callados = panel.callados.includes(animal) ? panel.callados.filter((a) => a !== animal) : [...panel.callados, animal];
+      const nuevo = { A: 'cancion', B: 'libre', C: 'simon' }[tecla];
+      if (nuevo) { modo = nuevo; emitir({ tipo: 'modo', id: null, ok: true, modo, cancion }); }
+      emitir({ tipo: 'tecla', tecla });
+      emitir({ ...panel, callados: [...panel.callados] });
     },
     reconectar(nodo) {
       conectados[nodo] = true;
