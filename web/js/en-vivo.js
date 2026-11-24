@@ -34,6 +34,7 @@ const estado = {
   recuperados: 0,
   recuperadoHasta: 0,
   silenciado: false,
+  alertaCerrada: '',        // animales del aviso que se cerró a mano
   gestos: { gatito: 0, ranita: 0, pollito: 0 },
   simon: { aciertos: 0, turnos: 0 },
   juntosS: 0,
@@ -217,20 +218,22 @@ function pintarFilas() {
 function pintarAlerta() {
   const fuera = ANIMALES.filter(({ id }) => estado.animales[id].conectado === false);
   const alerta = $('alerta');
-  if (!fuera.length) {
+  // Si la terapeuta cerró el aviso, no vuelve a salir hasta que se desconecte alguien más
+  const clave = fuera.map((a) => a.id).join(',');
+  if (!fuera.length || clave === estado.alertaCerrada) {
+    if (!fuera.length) estado.alertaCerrada = '';
     alerta.hidden = true;
     return;
   }
   const primero = fuera[0];
   const desde = estado.animales[primero.id].desconectadoDesde;
   $('alerta-cara').replaceChildren(cara(primero.id, 34));
-  $('alerta-cara').style.opacity = '0.6';
   $('alerta-titulo').textContent = fuera.length === 1
     ? `${primero.id === 'ranita' ? 'La' : 'El'} ${primero.nombre} se desconectó ${haceCuanto(Date.now() - desde)}`
     : `Se desconectaron: ${fuera.map((a) => a.nombre).join(' y ')}`;
   $('alerta-ayuda').textContent = primero.id === 'osito'
     ? 'Revisa que el osito esté encendido y conectado a la laptop.'
-    : 'Revisa que esté encendido y cerca del osito. El aviso se quita solo cuando vuelva.';
+    : 'Revisa que esté encendido y cerca del osito. El LED rojo del osito también avisa.';
   alerta.hidden = false;
 }
 
@@ -366,10 +369,15 @@ async function cargarCanciones() {
 function prepararAcciones() {
   $('cancion').addEventListener('change', (e) => elegirModo(estado.modo, e.target.value));
 
+  $('cerrar-alerta').addEventListener('click', () => {
+    estado.alertaCerrada = ANIMALES.filter(({ id }) => estado.animales[id].conectado === false).map((a) => a.id).join(',');
+    $('alerta').hidden = true;
+  });
+
   $('silenciar').addEventListener('click', async () => {
     estado.silenciado = !estado.silenciado;
     $('silenciar').setAttribute('aria-pressed', String(estado.silenciado));
-    $('silenciar').textContent = estado.silenciado ? 'Reactivar sonido de aviso' : 'Silenciar sonido de aviso';
+    $('silenciar').textContent = estado.silenciado ? 'Reactivar sonido' : 'Silenciar sonido';
     try {
       await silenciarAviso(estado.silenciado);
     } catch (error) {

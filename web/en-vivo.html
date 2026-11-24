@@ -26,17 +26,6 @@
 </header>
 
 
-<section class="alerta" id="alerta" role="alert" hidden>
-  <div class="cuadro-cara" id="alerta-cara" style="width: 48px; height: 48px; background: #ffffff"></div>
-  <div class="alerta__texto">
-    <p class="alerta__titulo" id="alerta-titulo"></p>
-    <p class="alerta__ayuda" id="alerta-ayuda"></p>
-  </div>
-  <div class="alerta__acciones">
-    <span class="alerta__led">El LED rojo del osito ya avisa</span>
-    <button class="boton boton--alerta" type="button" id="silenciar" aria-pressed="false">Silenciar sonido de aviso</button>
-  </div>
-</section>
 
 <h1 class="titulo-pagina" id="titulo">Sesión en vivo</h1>
 
@@ -72,6 +61,21 @@
 </section>
 
 </div>
+
+<!-- Aviso flotante: aparece arriba sin mover el resto de la pantalla. El LED rojo del osito también avisa. -->
+<section class="alerta" id="alerta" role="alert" hidden>
+  <div class="cuadro-cara" id="alerta-cara" style="width: 44px; height: 44px; background: var(--alerta-fondo)"></div>
+  <div class="alerta__texto">
+    <p class="alerta__titulo" id="alerta-titulo"></p>
+    <p class="alerta__ayuda" id="alerta-ayuda"></p>
+  </div>
+  <div class="alerta__acciones">
+    <button class="boton boton--alerta" type="button" id="silenciar" aria-pressed="false">Silenciar sonido</button>
+    <button class="alerta__cerrar" type="button" id="cerrar-alerta" aria-label="Cerrar aviso">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+</section>
 
 <dialog class="ventana" id="ventana-terminar" aria-labelledby="t-terminar">
   <form class="ventana__contenido" method="dialog" id="form-terminar">
