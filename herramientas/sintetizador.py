@@ -6,12 +6,16 @@ Solo lee el puerto: no le manda nada a la placa. Las demás líneas las muestra 
   python3 herramientas/sintetizador.py /dev/cu.usbserial-110
   python3 herramientas/sintetizador.py /dev/cu.usbserial-110 --medir   (hora de cada línea)
 
+--volumen 100 (0 a 127) ignora el potenciómetro del osito, por si falla o está desconectado.
 --medir pone los ms desde el inicio en cada [RADIO], [simon], [dj] y nota. Son la hora en que la
 línea llegó a la laptop; a eso se suma la latencia de audio que se imprime al abrir.
 Necesita: python3 -m pip install pyserial numpy sounddevice
 """
 import argparse
+import ctypes
+import gc
 import re
+import sys
 import threading
 import time
 
@@ -19,17 +23,30 @@ import numpy as np
 import serial
 import sounddevice as sd
 
-TASA = 44100
+TASA = 44100  # al abrir se cambia por la de la bocina, para que la Mac no tenga que convertir
+BLOQUE = 128
+# Audio ya preparado que espera en PortAudio (en C): si Python se atrasa, suena de ahí. Con un
+# callback la Mac pedía de 15 en 15 muestras y cada atraso se oía como un chasquido.
+RESERVA_S = 0.008  # quedan ~41 ms en total; si vuelve a cortarse, 0.02 (~65 ms)
 TRANSPONER = 12  # una octava arriba: los graves casi no se oyen en bocinas chicas
 SIN_OFF_S = 0.4  # si el firmware no imprime OFF, la nota se apaga sola
 
 PATRON = re.compile(r"\[AUDIO-(?:DAC|REGISTRO)\] (ON|OFF|EXP|VOL) ([\d ]+)")
 
+np.random.uniform()  # la primera vez tarda ~20 ms: que no sea a media canción
 candado = threading.Lock()
 voces = {}  # (canal, nota) -> dict
+colas = []  # notas que se volvieron a tocar: su final sigue sonando, para que no se corte de golpe
+cortes = [0]  # veces que la laptop no alcanzó a entregar el audio a tiempo
 expresion = {c: 127 for c in range(1, 17)}
 volumen = [64]
 vio_off = [False]
+
+
+# El niño en Canción (canal 13) toca la misma nota que la melodía: un poco desafinada no se anula
+# con ella y se siente más llena.
+CANAL_GUIA = 13
+DESAFINA_GUIA = 1.003
 
 
 def hz(nota):
@@ -165,7 +182,7 @@ def generar(voz, n):
         return colchon(voz, t).astype(np.float32)
     if voz["canal"] == CANAL_VIOLIN:
         return violin(voz, t).astype(np.float32)
-    f = hz(voz["nota"])
+    f = hz(voz["nota"]) * (DESAFINA_GUIA if voz["canal"] == CANAL_GUIA else 1)
     onda = np.zeros(n)
     for i, (fuerza, rapidez) in enumerate(ARMONICOS, start=1):
         onda += fuerza * np.exp(-t * rapidez / CAIDA_PIANO_S) * np.sin(2 * np.pi * f * i * t)
@@ -188,37 +205,101 @@ def terminada(voz):
     return t > CAIDA_PIANO_S * 5
 
 
-def al_pedir_audio(salida, n, _tiempo, _estado):
+def sonar(voz, n):
+    """El siguiente pedazo de la voz. El volumen cambia poco a poco, no de un salto."""
+    g = voz["vel"] / 127 * expresion[voz["canal"]] / 127 * volumen[0] / 127
+    antes = voz.get("g", g)
+    voz["g"] = g
+    return generar(voz, n) * np.linspace(antes, g, n, dtype=np.float32) * 0.35
+
+
+def orden_audio(orden, nums):
+    """ON canal nota velocidad, OFF canal nota, EXP canal valor, VOL valor."""
+    with candado:
+        if orden == "ON" and len(nums) == 3:
+            c, n, v = nums
+            anterior = voces.pop((c, n), None)
+            if anterior is not None:
+                if anterior.get("soltada") is None:
+                    anterior["soltada"] = anterior["fase"] / TASA
+                colas.append(anterior)
+            voces[(c, n)] = {"canal": c, "nota": n, "vel": v, "fase": 0,
+                             "inicio": time.monotonic()}
+        elif orden == "OFF" and len(nums) == 2:
+            vio_off[0] = True
+            voz = voces.get(tuple(nums))
+            if voz is not None and voz.get("soltada") is None:
+                voz["soltada"] = voz["fase"] / TASA
+        elif orden == "EXP" and len(nums) == 2:
+            expresion[nums[0]] = nums[1]
+        elif orden == "VOL" and len(nums) == 1:
+            volumen[0] = nums[0]
+
+
+def al_pedir_audio(salida, n):
     mezcla = np.zeros(n, dtype=np.float32)
     ahora = time.monotonic()
     with candado:
+        colas[:] = [voz for voz in colas if not terminada(voz)]
+        for voz in colas:
+            mezcla += sonar(voz, n)
         for clave, voz in list(voces.items()):
             if not vio_off[0] and voz.get("soltada") is None and ahora - voz["inicio"] > SIN_OFF_S:
                 voz["soltada"] = voz["fase"] / TASA
             if terminada(voz):
                 del voces[clave]
                 continue
-            g = voz["vel"] / 127 * expresion[voz["canal"]] / 127 * volumen[0] / 127
-            mezcla += generar(voz, n) * g * 0.35
+            mezcla += sonar(voz, n)
     salida[:, 0] = np.clip(mezcla, -1, 1)
 
 
+def prioridad_de_audio():
+    """En macOS, que este hilo no espere detrás de otros programas. En otros sistemas no hace nada."""
+    if sys.platform == "darwin":
+        ctypes.CDLL(None).pthread_set_qos_class_self_np(0x21, 0)  # QOS_CLASS_USER_INTERACTIVE
+
+
+def tocar(stream):
+    """Prepara el audio por adelantado; write() espera cuando la reserva está llena."""
+    prioridad_de_audio()
+    bloque = np.zeros((BLOQUE, 1), dtype=np.float32)
+    while True:
+        al_pedir_audio(bloque, BLOQUE)
+        if stream.write(bloque):
+            cortes[0] += 1
+
+
 def main():
+    global TASA
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("puerto", nargs="?", default="/dev/cu.usbserial-110")
     parser.add_argument("--medir", action="store_true", help="muestra la hora de cada línea")
+    parser.add_argument("--volumen", type=int, choices=range(128), metavar="0-127",
+                        help="volumen fijo: ignora el potenciómetro del osito")
     args = parser.parse_args()
+    if args.volumen is not None:
+        volumen[0] = args.volumen
     ser = serial.Serial()
     ser.port, ser.baudrate, ser.timeout = args.puerto, 115200, 0.5
     ser.dtr = ser.rts = False  # para no reiniciar la placa al abrir
     ser.open()
     print(f"Escuchando {args.puerto}. Ctrl+C para salir.")
+    if args.volumen is not None:
+        print(f"Volumen fijo en {args.volumen}: el potenciómetro no cuenta.")
     inicio = time.monotonic()
-    # latency="low": el valor por defecto usa un búfer grande y se oye atrasado.
-    with sd.OutputStream(samplerate=TASA, channels=1, callback=al_pedir_audio,
-                         latency="low") as audio:
+    TASA = int(sd.query_devices(kind="output")["default_samplerate"])
+    prioridad_de_audio()
+    gc.freeze()  # lo ya cargado no se vuelve a revisar a media canción
+    sys.setswitchinterval(0.001)  # que leer el puerto no le estorbe al audio
+    with sd.OutputStream(samplerate=TASA, channels=1, dtype="float32", blocksize=BLOQUE,
+                         latency=RESERVA_S) as audio:
+        threading.Thread(target=tocar, args=(audio,), daemon=True).start()
         print(f"Latencia de audio: {audio.latency * 1000:.0f} ms")
+        cortes_dichos = 0
         while True:
+            if cortes[0] != cortes_dichos:
+                cortes_dichos = cortes[0]
+                print(f"[AUDIO] la laptop no alcanzó a sonar a tiempo ({cortes_dichos} veces)")
             linea = ser.readline().decode("utf-8", "replace").strip()
             if not linea:
                 continue
@@ -232,20 +313,8 @@ def main():
                 print(linea)
                 continue
             orden, nums = m.group(1), [int(x) for x in m.group(2).split()]
-            with candado:
-                if orden == "ON" and len(nums) == 3:
-                    c, n, v = nums
-                    voces[(c, n)] = {"canal": c, "nota": n, "vel": v, "fase": 0,
-                                     "inicio": time.monotonic()}
-                elif orden == "OFF" and len(nums) == 2:
-                    vio_off[0] = True
-                    voz = voces.get(tuple(nums))
-                    if voz is not None and voz.get("soltada") is None:
-                        voz["soltada"] = voz["fase"] / TASA
-                elif orden == "EXP" and len(nums) == 2:
-                    expresion[nums[0]] = nums[1]
-                elif orden == "VOL" and len(nums) == 1:
-                    volumen[0] = nums[0]
+            if orden != "VOL" or args.volumen is None:
+                orden_audio(orden, nums)
             if orden == "VOL":
                 print(linea)
 
