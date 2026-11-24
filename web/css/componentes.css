@@ -251,11 +251,32 @@
   font-weight: 600;
 }
 
-/* Un campo de texto sí necesita borde visible (WCAG 1.4.11): línea inferior de 3.2:1 */
+/* Un campo de texto sí necesita borde visible (WCAG 1.4.11): contorno de 3.2:1 */
 .entrada {
-  border-bottom: 2px solid #8a8a82;
-  border-radius: 12px 12px 0 0;
-  background: var(--superficie);
+  min-height: 52px;
+  padding: 12px 16px;
+  border: 2px solid #8a8a82;
+  border-radius: var(--radio-chico);
+  background: #ffffff;
+  font-size: 16px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.entrada:hover {
+  border-color: var(--tinta-suave);
+}
+
+/* Al escribir: el borde se pinta de violeta con un halo suave, sin el contorno cuadrado de afuera */
+.entrada:focus,
+.entrada:focus-visible {
+  outline: none;
+  border-color: var(--violeta);
+  box-shadow: 0 0 0 4px rgb(104 88 212 / 18%);
+}
+
+textarea.entrada {
+  resize: vertical;
+  line-height: 1.4;
 }
 
 /* Desplegable propio (js/selector.js): la lista del sistema no se puede pintar con estos colores */
@@ -391,10 +412,11 @@
 /* ---------- Ventanas (dialog) ---------- */
 
 .ventana {
-  width: min(460px, 90vw);
+  width: min(500px, 90vw);
   border: none;
   border-radius: 28px;
-  padding: 24px;
+  padding: 32px;
+  box-shadow: 0 24px 60px rgb(28 28 26 / 25%);
 }
 
 .ventana::backdrop {
@@ -404,19 +426,34 @@
 .ventana__contenido {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 22px;
 }
 
 .ventana__titulo {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 800;
+}
+
+/* Dentro de una ventana el campo respira más y su etiqueta se lee mejor */
+.ventana .campo {
+  gap: 8px;
+}
+
+.ventana .campo label {
+  font-size: 15px;
+}
+
+.ventana .texto-ayuda {
+  font-size: 14px;
+  line-height: 1.4;
 }
 
 .ventana__acciones {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .ventana__datos {
