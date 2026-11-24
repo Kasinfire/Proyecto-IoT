@@ -14,9 +14,11 @@ const DIBUJOS = {
     colores: { B: '#9a6334', b: '#d9a06a', k: NEGRO, m: '#ecc79e', p: ROSA },
   },
   ranita: {
-    filas: ['.www....www.', '.wkw....wkw.', 'GwwwGGGGwwwG', 'GGGGGGGGGGGG', 'GGGGGGGGGGGG', 'GpGGGGGGGGpG',
+    filas: ['.www....www.', '.wAw....wBw.', 'GwwwGGGGwwwG', 'GGGGGGGGGGGG', 'GGGGGGGGGGGG', 'GpGGGGGGGGpG',
       'GGkGGGGGGkGG', 'GGGkkkkkkGGG', 'GggggggggggG', 'GggggggggggG', 'GGggggggggGG', '.GGGGGGGGGG.'],
     colores: { G: '#4fae4f', g: '#a6dc74', w: '#ffffff', k: NEGRO, p: ROSA },
+    // Ojos que se mueven: un ojo mira tranquilo de lado a lado y el otro anda por su cuenta
+    pupilas: { A: 'pupila pupila--tranquila', B: 'pupila pupila--loca' },
   },
   gatito: {
     filas: ['C..........C', 'CC........CC', 'CpC......CpC', 'CCCCCCCCCCCC', 'CCoCCooCCoCC', 'CCCCCCCCCCCC',
@@ -43,7 +45,8 @@ export function datosAnimal(id) {
 }
 
 // Crea un <svg> pixelado a partir de filas de letras.
-export function dibujoPixeles(filas, colores, ancho, alto = ancho) {
+// En "pupilas", cada letra es un ojo blanco con una pupila encima que se anima con su clase CSS.
+export function dibujoPixeles(filas, colores, ancho, alto = ancho, pupilas = {}) {
   const svg = document.createElementNS(SVG, 'svg');
   svg.setAttribute('viewBox', `0 0 ${filas[0].length} ${filas.length}`);
   svg.setAttribute('width', ancho);
@@ -51,25 +54,37 @@ export function dibujoPixeles(filas, colores, ancho, alto = ancho) {
   svg.setAttribute('shape-rendering', 'crispEdges');
   svg.setAttribute('aria-hidden', 'true');
   svg.classList.add('cara');
+  const pixel = (x, y, color) => {
+    const px = document.createElementNS(SVG, 'rect');
+    px.setAttribute('x', x);
+    px.setAttribute('y', y);
+    px.setAttribute('width', 1);
+    px.setAttribute('height', 1);
+    px.setAttribute('fill', color);
+    return px;
+  };
+  const encima = [];
   filas.forEach((fila, y) => {
     [...fila].forEach((letra, x) => {
+      if (pupilas[letra]) {
+        svg.append(pixel(x, y, '#ffffff'));
+        const pupila = pixel(x, y, NEGRO);
+        pupila.setAttribute('class', pupilas[letra]);
+        encima.push(pupila);
+        return;
+      }
       const color = colores[letra];
-      if (!color) return;
-      const px = document.createElementNS(SVG, 'rect');
-      px.setAttribute('x', x);
-      px.setAttribute('y', y);
-      px.setAttribute('width', 1);
-      px.setAttribute('height', 1);
-      px.setAttribute('fill', color);
-      svg.append(px);
+      if (color) svg.append(pixel(x, y, color));
     });
   });
+  // Las pupilas van al final para quedar encima del blanco del ojo al moverse
+  svg.append(...encima);
   return svg;
 }
 
 export function cara(id, tamano) {
   const dibujo = DIBUJOS[id];
-  return dibujoPixeles(dibujo.filas, dibujo.colores, tamano);
+  return dibujoPixeles(dibujo.filas, dibujo.colores, tamano, tamano, dibujo.pupilas);
 }
 
 // Carita dentro de su cuadro de color (el tono claro del animal).
