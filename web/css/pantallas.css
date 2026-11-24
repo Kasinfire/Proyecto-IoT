@@ -9,6 +9,7 @@
 /* ================= En vivo ================= */
 
 .en-vivo {
+  flex: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 24px;
@@ -113,6 +114,8 @@
 
 .partitura {
   flex: 1 1 260px;
+  align-self: stretch;
+  align-content: center;
   min-width: 0;
   display: grid;
   grid-template-columns: repeat(20, minmax(0, 1fr));

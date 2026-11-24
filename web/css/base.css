@@ -109,9 +109,12 @@ p {
 }
 
 .pagina {
-  max-width: 1360px;
+  /* Ocupa toda la pantalla: en la laptop del consultorio se usa a pantalla completa */
+  max-width: 1840px;
+  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0 auto;
-  padding: 40px 56px 56px;
+  padding: clamp(24px, 2.5vw, 40px) clamp(20px, 3vw, 56px);
   display: flex;
   flex-direction: column;
   gap: 24px;
