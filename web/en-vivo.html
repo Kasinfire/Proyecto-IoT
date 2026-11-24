@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sesión en vivo · Orquesta</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/componentes.css">
+<link rel="stylesheet" href="css/pantallas.css">
+</head>
+<body>
+<div class="pagina">
+
+<header class="encabezado">
+  <div class="marca"><div class="marca__logo" data-logo></div><p>Orquesta<span>Kids</span></p></div>
+  <nav class="menu" aria-label="Secciones">
+    <a href="en-vivo.html" aria-current="page">En vivo</a>
+    <a href="historial.html">Historial</a>
+    <a href="canciones.html">Canciones</a>
+    <a href="ninos.html">Niños</a>
+  </nav>
+  <div class="encabezado__acciones">
+    <a class="boton" href="proyector.html" target="_blank" rel="noopener">Abrir en proyector</a>
+    <button class="boton" type="button" id="terminar">Terminar sesión</button>
+  </div>
+</header>
+
+<p class="aviso-ensayo" data-aviso-ensayo hidden>Modo ensayo: los datos son simulados, no vienen de los animalitos.</p>
+
+<section class="alerta" id="alerta" role="alert" hidden>
+  <div class="cuadro-cara" id="alerta-cara" style="width: 48px; height: 48px; background: #ffffff"></div>
+  <div class="alerta__texto">
+    <p class="alerta__titulo" id="alerta-titulo"></p>
+    <p class="alerta__ayuda" id="alerta-ayuda"></p>
+  </div>
+  <div class="alerta__acciones">
+    <span class="alerta__led">El LED rojo del osito ya avisa</span>
+    <button class="boton boton--alerta" type="button" id="silenciar" aria-pressed="false">Silenciar sonido de aviso</button>
+  </div>
+</section>
+
+<h1 class="titulo-pagina" id="titulo">Sesión en vivo</h1>
+
+<div class="en-vivo">
+  <section class="orquesta" aria-labelledby="t-orquesta">
+    <div class="orquesta__cabeza">
+      <h2 class="titulo-seccion" id="t-orquesta">Orquesta en vivo <span class="orquesta__resumen" id="resumen-animales"></span></h2>
+      <span class="orquesta__ayuda">partitura de los últimos 20 s · ahora a la derecha</span>
+    </div>
+    <div class="orquesta__filas" id="filas"></div>
+  </section>
+
+  <aside class="en-vivo__lado">
+    <section class="bloque" aria-labelledby="t-juego">
+      <h2 class="titulo-seccion" id="t-juego">Juego</h2>
+      <div class="modos" id="modos" role="radiogroup" aria-labelledby="t-juego"></div>
+      <div class="campo">
+        <label for="cancion">Canción</label>
+        <select class="selector" id="cancion"></select>
+      </div>
+    </section>
+
+    <section class="bloque" aria-labelledby="t-conexion">
+      <h2 class="titulo-seccion" id="t-conexion">Conexión</h2>
+      <div id="conexion" aria-live="polite"></div>
+    </section>
+  </aside>
+</div>
+
+<section class="bloque" aria-labelledby="t-resumen">
+  <h2 class="titulo-seccion" id="t-resumen">Resumen de la sesión</h2>
+  <div class="resumen" id="resumen"></div>
+</section>
+
+</div>
+
+<dialog class="ventana" id="ventana-terminar" aria-labelledby="t-terminar">
+  <form class="ventana__contenido" method="dialog" id="form-terminar">
+    <h2 class="ventana__titulo" id="t-terminar">¿Terminar la sesión?</h2>
+    <p>Se guardará en el historial y la música se detendrá.</p>
+    <div class="ventana__datos" id="terminar-datos"></div>
+    <div class="campo">
+      <label for="nota">Nota para la próxima sesión (opcional)</label>
+      <textarea class="entrada" id="nota" rows="2"></textarea>
+    </div>
+    <p class="ventana__error" id="terminar-error" hidden></p>
+    <div class="ventana__acciones">
+      <button class="boton" type="submit" value="seguir">Seguir en la sesión</button>
+      <button class="boton boton--principal" type="submit" value="terminar">Terminar y guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="js/en-vivo.js"></script>
+</body>
+</html>
