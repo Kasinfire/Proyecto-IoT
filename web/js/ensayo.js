@@ -78,11 +78,15 @@ export function iniciarSimulacion(emitir) {
   emitir({ tipo: 'red', internet: true, pendientes: 0, guardado: Date.now() });
   emitir({ tipo: 'volumen', nodo: 'osito', valor: 70 });
 
-  // A los 6 s el pollito "se apaga", para ver la alerta.
+  // A los 6 s el pollito "se apaga", para ver la alerta, y a los 15 s vuelve y la alerta se quita sola.
   setTimeout(() => {
     conectados.pollito = false;
     emitir({ tipo: 'estado', nodo: 'pollito', conectado: false });
   }, 6000);
+  setTimeout(() => {
+    conectados.pollito = true;
+    emitir({ tipo: 'estado', nodo: 'pollito', conectado: true });
+  }, 21000);
 
   setInterval(() => {
     paso += 1;
