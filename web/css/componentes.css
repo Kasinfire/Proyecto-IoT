@@ -215,6 +215,113 @@
   background: var(--superficie);
 }
 
+/* Desplegable propio (js/selector.js): la lista del sistema no se puede pintar con estos colores */
+.desplegable {
+  position: relative;
+  min-width: 160px;
+}
+
+.desplegable__boton {
+  width: 100%;
+  min-height: var(--objetivo-min);
+  padding: 0 12px 0 14px;
+  border: none;
+  border-radius: var(--radio-chico);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--relleno);
+  font-weight: 600;
+  text-align: left;
+}
+
+.desplegable__texto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desplegable__boton svg {
+  flex: none;
+  color: var(--tinta-suave);
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.desplegable__boton:not(:disabled):hover,
+.esta-abierto .desplegable__boton {
+  background: var(--relleno-encima);
+}
+
+.esta-abierto .desplegable__boton svg {
+  transform: rotate(-90deg);
+}
+
+.desplegable__boton:disabled {
+  cursor: default;
+  color: var(--tinta-tenue);
+}
+
+.desplegable__lista {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  border-radius: var(--radio);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgb(28 28 26 / 6%), 0 14px 36px rgb(28 28 26 / 16%);
+  animation: desplegar 0.14s ease-out;
+}
+
+.hacia-arriba .desplegable__lista {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.desplegable__lista:focus {
+  outline: none;
+}
+
+.desplegable__opcion {
+  min-height: var(--objetivo-min);
+  padding: 0 12px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.desplegable__opcion.es-activa { background: var(--relleno); }
+.desplegable__opcion[aria-selected="true"] { background: var(--lima); font-weight: 800; }
+.desplegable__opcion[aria-selected="true"].es-activa { background: var(--lima-encima); }
+.desplegable__opcion[aria-disabled="true"] { opacity: 0.5; cursor: default; }
+
+/* Con teclado, la opción marcada lleva el mismo contorno que el foco */
+.desplegable__lista:focus-visible .es-activa {
+  outline: 3px solid var(--violeta);
+  outline-offset: -3px;
+}
+
+@keyframes desplegar {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+.hacia-arriba .desplegable__lista { animation-name: desplegar-arriba; }
+
+@keyframes desplegar-arriba {
+  from { opacity: 0; transform: translateY(4px); }
+}
+
 /* ---------- Ventanas (dialog) ---------- */
 
 .ventana {

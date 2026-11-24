@@ -3,6 +3,7 @@
 import { ponerLogos } from './caritas.js';
 import { esEnsayo } from './conexion.js';
 import { sesionActual } from './api.js';
+import { mejorarSelectores } from './selector.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -78,6 +79,7 @@ export function fechaCorta(iso) {
 // Cosas comunes a todas las páginas: logo, aviso de ensayo, enlaces y acceso a la sesión en curso.
 export async function iniciarPagina() {
   ponerLogos();
+  mejorarSelectores();
 
   if (esEnsayo()) {
     document.querySelector('[data-aviso-ensayo]')?.removeAttribute('hidden');

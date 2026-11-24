@@ -25,10 +25,12 @@
   --superficie: #f6f6f1;
   --relleno: #f1f1ec;
   --relleno-nav: #f3f3ee;
+  --relleno-encima: #e6e6df; /* fondo gris al pasar el mouse */
 
   /* Acentos: lima = lo elegido, violeta = la acción principal */
   --lima: #dcf16b;
   --lima-claro: #eef6c8;
+  --lima-encima: #d0e65a;
   --violeta: #6858d4;
 
   /* Avisos */
