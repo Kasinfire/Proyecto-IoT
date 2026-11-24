@@ -4,17 +4,19 @@
 
 #include "config.h"
 #include "led_estado.h"
+#include "mensajes_osito.h"
 #include "sensor_agitacion.h"
 
 void setup() {
   Serial.begin(config::BAUDIOS);
+  enlace::iniciar(protocolo::Nodo::Pollito);  // antes que todo lo demás de Wi-Fi
   sensor_agitacion::iniciar();
   led_estado::iniciar();
-  enlace::iniciar(protocolo::Nodo::Pollito);
 }
 
 void loop() {
   sensor_agitacion::actualizar();
+  mensajes_osito::actualizar();
   led_estado::actualizar();
   enlace::actualizar();
 
