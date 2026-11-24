@@ -32,6 +32,9 @@ constexpr uint32_t VUELTA_TAREA_MS = 10;
 // Sin esto WiFiClientSecure espera hasta 30 s al conectar y 120 s en el saludo TLS.
 constexpr uint32_t CONEXION_TCP_MS = 5000;
 constexpr unsigned long SALUDO_TLS_S = 10;
+// Con picos de 3 s en el Wi-Fi, una espera corta da por caída una conexión que solo va lenta.
+constexpr uint16_t ESPERA_MQTT_S = 10;
+constexpr size_t MENSAJES_POR_VUELTA = 8;
 constexpr size_t TAG_CIFRADO_BYTES = 16;
 constexpr size_t SOBRE_MAX = cifrado::NONCE_BYTES + config::EVENTO_JSON_MAX + TAG_CIFRADO_BYTES;
 constexpr size_t BASE64_MAX = ((SOBRE_MAX + 2) / 3) * 4 + 1;
@@ -111,7 +114,7 @@ void TransporteMqttReal::iniciar(AlMensaje al_mensaje) {
   cliente_.setCallback(recibir);
   cliente_.setBufferSize(config::BUFFER_MQTT_BYTES);
   cliente_.setKeepAlive(30);
-  cliente_.setSocketTimeout(3);
+  cliente_.setSocketTimeout(ESPERA_MQTT_S);
   tls_.setCACert(CA_CERT_PEM);
   tls_.setConnectionTimeout(CONEXION_TCP_MS);
   tls_.setHandshakeTimeout(SALUDO_TLS_S);
@@ -245,7 +248,9 @@ void TransporteMqttReal::vueltaDeTarea() {
     return;
   }
 
-  cliente_.loop();
+  // Al menos una vuelta (mantiene vivo el keepalive); más si ya hay mensajes esperando.
+  for (size_t i = 0; i < MENSAJES_POR_VUELTA && cliente_.loop() && tls_.available() > 0; ++i) {
+  }
   Saliente mensaje;
   while (xQueueReceive(salientes_, &mensaje, 0) == pdTRUE) {
     if (!cliente_.publish(mensaje.topico, mensaje.payload, mensaje.retenido)) {
@@ -322,6 +327,10 @@ bool TransporteMqttReal::conectarBroker() {
     Serial.printf("[MQTTS] Conexión TLS/MQTT falló (estado %d); reintentaré\n",
                   cliente_.state());
     return false;
+  }
+  // Sin Nagle: un mensaje corto no espera el acuse TCP del anterior.
+  if (tls_.setNoDelay(true) < 0) {
+    Serial.println("[MQTTS] No se pudo quitar la espera de Nagle; sigo igual");
   }
   if (!cliente_.subscribe(contrato_mqtt::TOPICO_MODO) ||
       !cliente_.subscribe(contrato_mqtt::TOPICO_SYNC_ACK) ||

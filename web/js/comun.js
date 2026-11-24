@@ -31,6 +31,13 @@ const TRAZOS = {
   wifi: '<path d="M2 9a15 15 0 0 1 20 0"></path><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8.5 16a5 5 0 0 1 7 0"></path><path d="M12 19.5h.01"></path>',
   wifiTachado: '<path d="M2 9a15 15 0 0 1 20 0"></path><path d="M5 12.5a10 10 0 0 1 14 0"></path><path d="M8.5 16a5 5 0 0 1 7 0"></path><path d="M12 19.5h.01"></path><path d="M3 3l18 18"></path>',
   reintentar: '<path d="M21 12a9 9 0 1 1-3-6.7"></path><path d="M21 4v5h-5"></path>',
+  bocina: '<path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M17 9a4 4 0 0 1 0 6"></path>',
+  bocinaTachada: '<path d="M4 9v6h4l5 4V5L8 9z"></path><path d="M17 10l4 4M21 10l-4 4"></path>',
+  lapiz: '<path d="M4 20l1-4L16 5l3 3L8 19z"></path>',
+  basura: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path>',
+  pantalla: '<rect x="3" y="4" width="18" height="12" rx="2"></rect><path d="M8 20h8M12 16v4"></path>',
+  servidor: '<rect x="4" y="4" width="16" height="7" rx="2"></rect><rect x="4" y="13" width="16" height="7" rx="2"></rect><path d="M8 7.5h.01M8 16.5h.01"></path>',
+  duda: '<path d="M9 9a3 3 0 1 1 4 2.8c-.7.3-1 .8-1 1.7"></path><path d="M12 17h.01"></path>',
   palomita: '<path d="M5 12.5l4.5 4.5L19 7.5"></path>',
 };
 

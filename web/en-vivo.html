@@ -29,7 +29,23 @@
 
 
 
-<h1 class="titulo-pagina" id="titulo">Sesión en vivo</h1>
+<div class="titulo-en-vivo">
+<div class="titulo-en-vivo__quien"><div id="avatar"></div><h1 class="titulo-pagina" id="titulo">Sesión en vivo</h1></div>
+<!-- Comparte la fila del título para no tapar los controles. El LED rojo del osito también avisa. -->
+<section class="alerta" id="alerta" role="alert" hidden>
+  <div class="cuadro-cara" id="alerta-cara" style="width: 44px; height: 44px; background: var(--alerta-fondo)"></div>
+  <div class="alerta__texto">
+    <p class="alerta__titulo" id="alerta-titulo"></p>
+    <p class="alerta__ayuda" id="alerta-ayuda"></p>
+  </div>
+  <div class="alerta__acciones">
+    <button class="boton boton--alerta" type="button" id="silenciar" aria-pressed="false">Silenciar sonido</button>
+    <button class="alerta__cerrar" type="button" id="cerrar-alerta" aria-label="Cerrar aviso">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+</section>
+</div>
 
 <div class="en-vivo">
   <section class="orquesta" aria-labelledby="t-orquesta">
@@ -52,7 +68,8 @@
 
     <section class="bloque" aria-labelledby="t-conexion">
       <h2 class="titulo-seccion" id="t-conexion">Conexión</h2>
-      <div id="conexion" aria-live="polite"></div>
+      <p class="solo-lector" id="conexion-aviso" aria-live="polite"></p>
+      <div id="conexion"></div>
     </section>
   </aside>
 </div>
@@ -68,21 +85,6 @@
 </section>
 
 </div>
-
-<!-- Aviso flotante: aparece arriba sin mover el resto de la pantalla. El LED rojo del osito también avisa. -->
-<section class="alerta" id="alerta" role="alert" hidden>
-  <div class="cuadro-cara" id="alerta-cara" style="width: 44px; height: 44px; background: var(--alerta-fondo)"></div>
-  <div class="alerta__texto">
-    <p class="alerta__titulo" id="alerta-titulo"></p>
-    <p class="alerta__ayuda" id="alerta-ayuda"></p>
-  </div>
-  <div class="alerta__acciones">
-    <button class="boton boton--alerta" type="button" id="silenciar" aria-pressed="false">Silenciar sonido</button>
-    <button class="alerta__cerrar" type="button" id="cerrar-alerta" aria-label="Cerrar aviso">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-    </button>
-  </div>
-</section>
 
 <dialog class="ventana" id="ventana-terminar" aria-labelledby="t-terminar">
   <form class="ventana__contenido" method="dialog" id="form-terminar">

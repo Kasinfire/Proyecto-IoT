@@ -2,6 +2,7 @@
 // Los datos los guarda Node-RED en Supabase y aquí se piden a Node-RED (nunca directo a Supabase).
 
 import { cuadroCara, datosAnimal } from './caritas.js';
+import { cuadroAvatar } from './avatar.js';
 import { el, fechaCorta, iniciarPagina } from './comun.js';
 import { explicar, obtenerHistorial, obtenerNinos } from './api.js';
 
@@ -9,7 +10,11 @@ const NOMBRE_MODO = { cancion: 'Canción', libre: 'Libre', simon: 'Simón Dice' 
 
 const $ = (id) => document.getElementById(id);
 
+let ninos = [];
+
 function pintarSesiones(sesiones, alias) {
+  const nino = ninos.find((n) => n.alias === alias);
+  $('avatar').replaceChildren(...(nino ? [cuadroAvatar(nino.avatar, nino.alias, 56)] : []));
   $('t-sesiones').replaceChildren(`Sesiones de ${alias} `, el('span', { style: { fontWeight: 600 } }, `· ${sesiones.length}`));
   if (!sesiones.length) {
     $('lista-sesiones').replaceChildren(el('p', { class: 'vacio' }, 'Todavía no hay sesiones guardadas en este periodo.'));
@@ -86,7 +91,7 @@ async function cargarHistorial() {
 async function arrancar() {
   iniciarPagina();
   try {
-    const ninos = await obtenerNinos();
+    ninos = await obtenerNinos();
     $('nino').replaceChildren(...ninos.map((n) => el('option', { value: n.alias }, n.nombre ? `${n.nombre} (${n.alias})` : n.alias)));
     // Si llegan desde la tarjeta de un niño (historial.html?alias=B-12), se abre el suyo
     const pedido = new URLSearchParams(location.search).get('alias');

@@ -1,12 +1,14 @@
 // Panel DJ: el teclado 4x4 del osito en la pantalla. Se ilumina con las teclas reales, muestra qué
 // está encendido y también se puede tocar desde aquí (Node-RED se lo manda al osito).
 
-import { el } from './comun.js';
+import { cara } from './caritas.js';
+import { el, icono } from './comun.js';
 import { explicar, tocarTecla } from './api.js';
 
 const TECLAS = [...'123A456B789C*0#D'];
 const DESTELLO_MS = 250;
 const LARGA_MS = 1000;
+const ESPERA_MS = 8000; // sin respuesta del osito en este tiempo, se avisa
 const RITMOS = { apagado: 'apagado', tranquilo: 'tranquilo', pop: 'pop', cumbia: 'cumbia' };
 const LOOPS = { vacio: 'vacío', grabando: 'grabando', sonando: 'sonando', parado: 'en pausa' };
 const ANIMAL = { 1: ['ranita', 'Ranita'], 2: ['gatito', 'Gatito'], 3: ['pollito', 'Pollito'] };
@@ -16,7 +18,7 @@ const MODO = { A: ['cancion', 'Canción'], B: ['libre', 'Libre'], C: ['simon', '
 function describir(tecla, p, modo) {
   if (ANIMAL[tecla]) {
     const callado = p.callados.includes(ANIMAL[tecla][0]);
-    return { texto: ANIMAL[tecla][1], estado: callado ? 'callado' : 'suena', encendida: !callado, sirve: true };
+    return { texto: ANIMAL[tecla][1], estado: callado ? 'en silencio' : 'suena', encendida: !callado, sirve: true };
   }
   if (MODO[tecla]) {
     const actual = modo === MODO[tecla][0];
@@ -42,17 +44,22 @@ function describir(tecla, p, modo) {
   }[tecla];
 }
 
-export function crearPanel(caja) {
+// alResponder(ms): cuánto tardó el osito en confirmar una tecla tocada aquí.
+export function crearPanel(caja, alResponder = () => {}) {
   let datos = null;
   let modo = 'cancion';
   let enLinea = false;
+  const esperando = []; // { tecla, desde, reloj } de lo tocado aquí y aún sin confirmar
   const ayuda = el('p', { class: 'texto-ayuda' });
   const error = el('p', { class: 'panel-dj__error', role: 'alert', hidden: true });
   const botones = Object.fromEntries(TECLAS.map((tecla) => {
     const texto = el('span', { class: 'tecla__texto' });
     const estado = el('span', { class: 'tecla__estado' });
-    const boton = el('button', { type: 'button', class: 'tecla', 'data-tecla': tecla },
-      el('span', { class: 'tecla__simbolo', 'aria-hidden': 'true' }, tecla), texto, estado);
+    const animal = ANIMAL[tecla]?.[0];
+    const boton = el('button', {
+      type: 'button', class: `tecla${animal ? ' tecla--animal' : ''}`, 'data-tecla': tecla,
+      style: animal ? `--animal-claro: var(--${animal}-claro); --animal-fuerte: var(--${animal}-fuerte)` : null,
+    }, el('span', { class: 'tecla__simbolo', 'aria-hidden': 'true' }, animal ? cara(animal, 26) : null, animal ? el('small', {}, tecla) : tecla), texto, estado);
     prepararBoton(tecla, boton);
     return [tecla, { boton, texto, estado }];
   }));
@@ -79,14 +86,37 @@ export function crearPanel(caja) {
     });
   }
 
+  function destello(boton) {
+    boton.classList.add('tecla--apretada');
+    setTimeout(() => boton.classList.remove('tecla--apretada'), DESTELLO_MS);
+  }
+
+  function dejarDeEsperar(uno) {
+    clearTimeout(uno.reloj);
+    const i = esperando.indexOf(uno);
+    if (i >= 0) esperando.splice(i, 1);
+    pintar();
+  }
+
+  function fallo(texto) {
+    error.textContent = texto;
+    error.hidden = false;
+  }
+
   async function mandar(tecla) {
+    // Se ve enseguida que se tocó; el estado solo cambia cuando el osito lo confirma.
+    destello(botones[tecla === 'd' ? 'D' : tecla].boton);
+    const uno = { tecla, desde: Date.now() };
+    uno.reloj = setTimeout(() => { dejarDeEsperar(uno); fallo('El osito no respondió a la tecla.'); }, ESPERA_MS);
+    esperando.push(uno);
+    pintar();
     try {
       await tocarTecla(tecla);
       error.hidden = true;
     } catch (e) {
       console.error('[panel] No se pudo mandar la tecla:', e);
-      error.textContent = explicar(e, 'No se pudo tocar la tecla');
-      error.hidden = false;
+      dejarDeEsperar(uno);
+      fallo(explicar(e, 'No se pudo tocar la tecla'));
     }
   }
 
@@ -96,10 +126,20 @@ export function crearPanel(caja) {
       const { boton, texto, estado } = botones[tecla];
       const d = datos ? describir(tecla, datos, modo) : { texto: ANIMAL[tecla]?.[1] ?? MODO[tecla]?.[1] ?? '', estado: null, encendida: false, sirve: false };
       texto.textContent = d.texto;
-      estado.textContent = d.estado ?? '';
+      const enviando = esperando.some((e) => (e.tecla === 'd' ? 'D' : e.tecla) === tecla);
+      const callado = Boolean(ANIMAL[tecla]) && d.estado === 'en silencio';
+      const palabra = enviando ? 'enviando…' : d.estado ?? '';
+      const clave = `${palabra}|${callado}`;
+      if (estado.dataset.clave !== clave) {
+        estado.dataset.clave = clave;
+        const bocina = ANIMAL[tecla] && d.estado && !enviando ? icono(callado ? 'bocinaTachada' : 'bocina', 15, 2.4) : null;
+        estado.replaceChildren(...(bocina ? [bocina] : []), palabra);
+      }
+      boton.classList.toggle('tecla--enviando', enviando);
+      boton.classList.toggle('tecla--callada', listo && callado);
       boton.disabled = !listo || !d.sirve;
       boton.classList.toggle('tecla--encendida', listo && d.encendida);
-      boton.setAttribute('aria-label', `Tecla ${tecla}: ${d.texto}${d.estado ? `, ${d.estado}` : ''}`);
+      boton.setAttribute('aria-label', `Tecla ${tecla}: ${d.texto}${palabra ? `, ${palabra}` : ''}`);
     }
     borrar.hidden = !listo || modo === 'simon' || !datos.capas;
     if (!enLinea) ayuda.textContent = 'El osito no está en línea.';
@@ -116,8 +156,13 @@ export function crearPanel(caja) {
     destellar(tecla) {
       const boton = botones[tecla === 'd' ? 'D' : tecla]?.boton;
       if (!boton) return;
-      boton.classList.add('tecla--apretada');
-      setTimeout(() => boton.classList.remove('tecla--apretada'), DESTELLO_MS);
+      const mia = esperando.find((e) => e.tecla === tecla);
+      if (mia) {
+        alResponder(Date.now() - mia.desde);
+        dejarDeEsperar(mia); // su destello ya se vio al tocarla
+        return;
+      }
+      destello(boton);
     },
   };
 }

@@ -1,8 +1,10 @@
 // Niños del consultorio. Las sesiones van por alias; el nombre es opcional, solo se ve aquí y en la
 // pantalla del terapeuta, y no sale de la laptop (Unidad 4, privacidad).
 
-import { cuadroCara, datosAnimal } from './caritas.js';
-import { el, iniciarPagina } from './comun.js';
+import { datosAnimal } from './caritas.js';
+import { avatarAlAzar, avatarPorDefecto, cuadroAvatar } from './avatar.js';
+import { crearEditorAvatar } from './editor-avatar.js';
+import { el, icono, iniciarPagina } from './comun.js';
 import { esEnsayo } from './conexion.js';
 import { agregarNino, borrarNino, editarNino, explicar, iniciarSesion, obtenerNinos } from './api.js';
 
@@ -32,25 +34,23 @@ function pintar(ninos) {
     return;
   }
   $('ninos').replaceChildren(...ninos.map((n) => {
-    const favorito = n.favorito ? datosAnimal(n.favorito) : null;
+    const quien = n.nombre || n.alias;
+    const favorito = n.favorito ? datosAnimal(n.favorito).nombre : null;
+    const datos = [n.simon_pct === null ? null : `Simón ${n.simon_pct} %`, favorito ? `más: ${favorito}` : null].filter(Boolean).join(' · ');
+    const accion = (dibujo, texto, hacer) => el('button', { type: 'button', class: 'nino__icono', 'aria-label': `${texto} a ${quien}`, title: texto, onclick: hacer }, icono(dibujo, 18));
     return el('article', { class: `nino${n.en_sesion ? ' nino--en-sesion' : ''}` },
-      el('div', { class: 'nino__cabeza' },
-        favorito
-          ? cuadroCara(favorito.id, 64, 44, n.en_sesion ? '#ffffff' : `var(--${favorito.id}-claro)`)
-          : el('div', { class: 'cuadro-cara', style: { width: '64px', height: '64px', background: '#ffffff' }, 'aria-hidden': 'true' }, el('span', { class: 'nino__inicial' }, [...(n.nombre || n.alias)][0].toUpperCase())),
-        el('div', {},
-          el('h2', { class: 'nino__alias' }, n.nombre || n.alias),
-          el('p', { class: 'nino__sesiones' }, `${n.nombre ? `${n.alias} · ` : ''}${n.sesiones} ${n.sesiones === 1 ? 'sesión' : 'sesiones'}`)),
-        n.en_sesion ? el('span', { class: 'nino__etiqueta' }, 'en sesión') : null),
-      el('div', { class: 'nino__datos' },
-        el('div', { class: 'mini-dato' }, el('small', {}, 'Simón Dice'), el('strong', {}, n.simon_pct === null ? '—' : `${n.simon_pct} %`)),
-        el('div', { class: 'mini-dato' }, el('small', {}, 'Toca más'), el('strong', {}, favorito ? favorito.nombre : '—'))),
+      n.en_sesion ? el('span', { class: 'nino__etiqueta' }, 'en sesión') : null,
+      cuadroAvatar(n.avatar, n.alias, 96),
+      el('h2', { class: 'nino__alias' }, quien),
+      el('p', { class: 'nino__sesiones' }, `${n.nombre ? `${n.alias} · ` : ''}${n.sesiones} ${n.sesiones === 1 ? 'sesión' : 'sesiones'}`),
+      el('p', { class: 'nino__sesiones' }, datos || 'Sin datos todavía'),
       el('div', { class: 'nino__acciones' },
         n.en_sesion ? el('a', { class: 'boton boton--principal', href: conEnsayo('en-vivo.html') }, 'Ir a la sesión') : null,
-        !haySesion ? el('button', { type: 'button', class: 'boton boton--principal', onclick: () => empezar(n.alias) }, 'Iniciar sesión') : null,
-        el('a', { class: 'boton boton--blanco', href: conEnsayo(`historial.html?alias=${encodeURIComponent(n.alias)}`) }, 'Ver historial'),
-        el('button', { type: 'button', class: 'boton boton--blanco', 'aria-label': `Editar a ${n.nombre || n.alias}`, onclick: () => abrirNino(n) }, 'Editar'),
-        !n.en_sesion ? el('button', { type: 'button', class: 'boton boton--blanco', 'aria-label': `Borrar a ${n.nombre || n.alias}`, onclick: () => abrirBorrar(n) }, 'Borrar') : null));
+        !haySesion ? el('button', { type: 'button', class: 'boton boton--principal', 'aria-label': `Iniciar sesión con ${quien}`, onclick: () => empezar(n.alias) }, 'Iniciar sesión') : null,
+        el('div', { class: 'nino__iconos' },
+          el('a', { class: 'nino__icono', href: conEnsayo(`historial.html?alias=${encodeURIComponent(n.alias)}`), 'aria-label': `Ver historial de ${quien}`, title: 'Ver historial' }, icono('reloj', 18)),
+          accion('lapiz', 'Editar y vestir', () => abrirNino(n)),
+          !n.en_sesion ? accion('basura', 'Borrar', () => abrirBorrar(n)) : null)));
   }));
 }
 
@@ -66,6 +66,7 @@ async function cargar() {
 
 let editando = null; // el niño que se está editando, o null si es nuevo
 let borrando = null;
+const editor = crearEditorAvatar($('avatar-editor'));
 
 function abrirNino(nino) {
   editando = nino;
@@ -78,6 +79,7 @@ function abrirNino(nino) {
   $('alias-ayuda').textContent = nino
     ? 'Una o dos letras y un número, como A-07. Si lo cambias, su historial se conserva.'
     : 'Una o dos letras y un número, como A-07. Si lo dejas vacío se pone solo.';
+  editor.poner(nino ? nino.avatar ?? avatarPorDefecto(nino.alias) : avatarAlAzar());
   $('nino-error').hidden = true;
   $('ventana-nino').showModal();
 }
@@ -117,16 +119,16 @@ function prepararVentanas() {
   $('agregar').addEventListener('click', () => abrirNino(null));
   // Enter en un campo usaría el primer botón del formulario (Cancelar).
   $('form-nino').addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' || e.target.tagName !== 'INPUT' || e.isComposing) return;
+    if (e.key !== 'Enter' || !e.target.matches('.entrada') || e.isComposing) return;
     e.preventDefault();
     $('form-nino').requestSubmit($('nino-guardar'));
   });
   alEnviar('form-nino', 'ventana-nino', 'guardar', 'nino-error', 'No se pudo guardar', async () => {
     const alias = $('alias').value.trim().toUpperCase();
     const nombre = $('nombre').value.trim();
-    if (editando) await editarNino(editando.alias, alias, nombre);
+    if (editando) await editarNino(editando.alias, alias, nombre, editor.valor());
     else if (!alias && !nombre) throw Object.assign(new Error('vacío'), { causa: 'escribe un nombre o un alias' });
-    else await agregarNino(alias, nombre);
+    else await agregarNino(alias, nombre, editor.valor());
   });
   alEnviar('form-borrar', 'ventana-borrar', 'borrar', 'borrar-error', 'No se pudo borrar', () => borrarNino(borrando.alias));
 }

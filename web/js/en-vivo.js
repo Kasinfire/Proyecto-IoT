@@ -2,6 +2,7 @@
 // Todo lo que se ve sale de los eventos que manda Node-RED (o el ensayo).
 
 import { ANIMALES, cara, cuadroCara } from './caritas.js';
+import { cuadroAvatar } from './avatar.js';
 import { el, icono, palomita, haceCuanto, iniciarPagina } from './comun.js';
 import { conectar, esEnsayo, simulador } from './conexion.js';
 import { crearPanel } from './panel.js';
@@ -11,6 +12,8 @@ const ACTIVO_MS = 2000;           // un animal está "tocando" si tuvo un gesto 
 const CELDAS = 20;                // segundos que muestra la partitura
 const ESPERA_ACK_MS = 8000;       // si el osito no confirma en este tiempo, se avisa
 const RECUPERADO_VISIBLE_MS = 6000;
+const RESPUESTA_LENTA_MS = 400;
+const ACKS_MAX = 20;
 const MINIMO_JUNTOS = 3;          // "tocando juntos" = 3 o más animales a la vez
 
 const MODOS = [
@@ -24,6 +27,7 @@ const MODOS = [
 const estado = {
   alias: null,
   nombre: '',               // opcional; solo lo ve el terapeuta
+  avatar: null,
   inicio: null,
   modo: 'cancion',
   cancion: null,
@@ -31,6 +35,9 @@ const estado = {
   sinRespuesta: false,
   ws: 'conectando',
   internet: true,
+  broker: true,
+  callados: [],
+  respuesta: null,          // ms que tardó el osito la última vez
   pendientesOsito: 0,
   guardado: null,
   recuperados: 0,
@@ -58,6 +65,18 @@ function marcarGesto(id, texto = '') {
   a.celdas[CELDAS - 1] = { tipo: 'toque', texto };
 }
 
+// Acuses de modo ya recibidos: uno puede llegar antes que la respuesta HTTP con su id.
+const acks = new Map();
+function anotarAck(id, ok) {
+  acks.set(id, ok);
+  if (acks.size > ACKS_MAX) acks.delete(acks.keys().next().value);
+}
+
+function anotarRespuesta(ms) {
+  estado.respuesta = ms;
+  pintarConexion();
+}
+
 function alEvento(msg) {
   const a = estado.animales[msg.nodo];
   switch (msg.tipo) {
@@ -80,7 +99,8 @@ function alEvento(msg) {
       break;
     case 'estado':
       if (!a) return;
-      if (a.conectado !== false && msg.conectado === false) a.desconectadoDesde = Date.now();
+      if (msg.conectado === false) a.desconectadoDesde = msg.desde ?? (a.conectado === true ? Date.now() : a.desconectadoDesde);
+      else a.desconectadoDesde = null;
       a.conectado = msg.conectado;
       break;
     case 'nota':
@@ -106,6 +126,8 @@ function alEvento(msg) {
       break;
     case 'panel':
       panel.actualizar(msg);
+      estado.callados = msg.callados;
+      pintarFilas();
       return;
     case 'tecla':
       panel.destellar(msg.tecla);
@@ -125,8 +147,14 @@ function alEvento(msg) {
         estado.modo = msg.modo;
         estado.cancion = msg.cancion ?? estado.cancion;
       }
-      if (estado.pendiente && msg.id === estado.pendiente.id) estado.pendiente = null;
-      estado.sinRespuesta = false;
+      if (msg.id !== null) anotarAck(msg.id, msg.ok);
+      if (estado.pendiente && msg.id !== null && msg.id === estado.pendiente.id) {
+        if (msg.ok) anotarRespuesta(Date.now() - estado.pendiente.desde);
+        estado.pendiente = null;
+        estado.sinRespuesta = !msg.ok;
+      } else if (!estado.pendiente && msg.ok) {
+        estado.sinRespuesta = false;
+      }
       pintarModos();
       pintarCancionElegida();
       break;
@@ -139,6 +167,7 @@ function alEvento(msg) {
     case 'red': {
       const volvio = !estado.internet && msg.internet;
       estado.internet = msg.internet;
+      estado.broker = msg.broker !== false;
       estado.pendientesOsito = msg.pendientes ?? 0;
       if (msg.guardado) estado.guardado = msg.guardado;
       if (volvio) {
@@ -159,20 +188,22 @@ function alEvento(msg) {
 
 function estaActivo(id) {
   const a = estado.animales[id];
-  if (a.conectado === false) return false;
+  if (a.conectado !== true) return false;
   if (id === 'osito') return a.conectado === true; // la base del osito siempre suena
   return Date.now() - a.ultimoGesto < ACTIVO_MS;
 }
 
 function situacion(id) {
   const a = estado.animales[id];
+  if (a.conectado === null) return 'nose';
   if (a.conectado === false) return 'fuera';
   return estaActivo(id) ? 'activo' : 'espera';
 }
 
 function textoDetalle(id) {
   const a = estado.animales[id];
-  if (a.conectado === false) return `Sin señal ${haceCuanto(Date.now() - a.desconectadoDesde)}`;
+  if (a.conectado === null) return id === 'osito' ? 'Esperando al osito' : 'Se sabe cuando el osito esté en línea';
+  if (a.conectado === false) return a.desconectadoDesde ? `Sin señal ${haceCuanto(Date.now() - a.desconectadoDesde)}` : 'Sin señal';
   if (id === 'gatito' && a.detalle) return `${a.detalle.texto}, ${haceCuanto(Date.now() - a.detalle.desde)}`;
   if (a.detalle) return a.detalle.texto;
   return { osito: 'Dirige la orquesta', ranita: 'Sin mano encima', gatito: 'Aún sin notas', pollito: 'Aún sin sacudidas' }[id];
@@ -185,7 +216,7 @@ function avanzarSegundo() {
     const a = estado.animales[id];
     a.celdas.shift();
     let nueva = null;
-    if (a.conectado === false) nueva = { tipo: 'sin' };
+    if (a.conectado !== true) nueva = { tipo: 'sin' };
     else if (id === 'osito' && a.conectado) nueva = { tipo: 'toque' };
     else if (id === 'ranita' && a.sombra > 0) nueva = { tipo: 'toque' };
     a.celdas.push(nueva);
@@ -203,6 +234,7 @@ function pintarTitulo() {
   // Sin sesión no hay nada que terminar; se abre desde Niños.
   $('terminar').hidden = !estado.alias;
   $('iniciar').hidden = Boolean(estado.alias);
+  $('avatar').replaceChildren(...(estado.alias ? [cuadroAvatar(estado.avatar, estado.alias, 56)] : []));
 }
 
 function quien() {
@@ -212,11 +244,13 @@ function quien() {
 async function buscarNombre() {
   const alias = estado.alias;
   estado.nombre = '';
+  estado.avatar = null;
   if (!alias) return;
   try {
     const nino = (await obtenerNinos()).find((n) => n.alias === alias);
     if (estado.alias !== alias) return; // cambió mientras tanto
     estado.nombre = nino?.nombre ?? '';
+    estado.avatar = nino?.avatar ?? null;
     pintarTitulo();
   } catch (error) {
     console.warn('[en-vivo] No se pudo leer el nombre:', error);
@@ -228,34 +262,58 @@ function pintarSilencio() {
   $('silenciar').textContent = estado.silenciado ? 'Reactivar sonido' : 'Silenciar sonido';
 }
 
+const ponerTexto = (nodo, texto) => { if (nodo.textContent !== texto) nodo.textContent = texto; };
+
+// Las filas se crean una vez; después solo se toca lo que cambió.
+const filas = {};
+function crearFila({ id, nombre, parte }) {
+  const f = {
+    nombre, sit: null, celdas: Array.from({ length: CELDAS }, () => el('span', { class: 'celda' })),
+    estado: el('span', { class: 'estado' }), detalle: el('span', { class: 'fila-animal__detalle' }),
+    callado: el('span', { class: 'estado estado--callado', hidden: true }, icono('bocinaTachada', 14, 2.4), 'En silencio'),
+  };
+  f.partitura = el('div', { class: 'partitura', role: 'img' }, f.celdas);
+  // Cada fila siempre lleva el color de su animal; el estado lo dice la etiqueta, no el fondo.
+  f.fila = el('article', { class: 'fila-animal', style: `--color-animal: var(--${id}-fuerte); background: var(--${id}-claro)` },
+    el('div', { class: 'fila-animal__quien' },
+      cuadroCara(id, 46, 34, '#ffffff'),
+      el('div', {},
+        el('h3', { class: 'fila-animal__nombre' }, nombre),
+        el('p', { class: 'fila-animal__parte' }, parte))),
+    el('div', { class: 'fila-animal__estado' }, el('div', { class: 'fila-animal__etiquetas' }, f.estado, f.callado), f.detalle),
+    f.partitura);
+  return f;
+}
+
 function pintarFilas() {
   const tocando = ANIMALES.filter(({ id }) => estaActivo(id)).length;
-  $('resumen-animales').textContent = `· ${tocando} de ${ANIMALES.length} tocando`;
+  ponerTexto($('resumen-animales'), `· ${tocando} de ${ANIMALES.length} tocando`);
 
-  $('filas').replaceChildren(...ANIMALES.map(({ id, nombre, parte }) => {
+  for (const { id } of ANIMALES) {
+    const f = filas[id];
     const sit = situacion(id);
-    const etiqueta = { activo: 'Tocando', espera: 'En espera', fuera: 'Desconectado' }[sit];
-    const iconoEstado = { activo: 'onda', espera: 'linea', fuera: 'tache' }[sit];
-    const celdas = estado.animales[id].celdas;
+    if (f.sit !== sit) {
+      f.sit = sit;
+      f.fila.className = `fila-animal fila-animal--${sit}`;
+      f.estado.className = `estado estado--${sit}`;
+      f.estado.replaceChildren(
+        icono({ activo: 'onda', espera: 'linea', fuera: 'tache', nose: 'duda' }[sit], 14, 2.6),
+        { activo: 'Tocando', espera: 'En espera', fuera: 'Desconectado', nose: 'Sin datos' }[sit]);
+    }
+    const callado = estado.callados.includes(id);
+    if (f.callado.hidden === callado) f.callado.hidden = !callado;
+    ponerTexto(f.detalle, textoDetalle(id));
+    const { celdas } = estado.animales[id];
+    celdas.forEach((c, i) => {
+      const span = f.celdas[i];
+      const clase = c?.tipo === 'sin' ? 'celda celda--sin' : c?.tipo === 'toque' ? 'celda celda--toque' : 'celda';
+      if (span.className !== clase) span.className = clase;
+      ponerTexto(span, c?.tipo === 'sin' ? '×' : c?.texto ?? '');
+    });
     const tocadas = celdas.filter((c) => c?.tipo === 'toque').length;
-
-    // Cada fila siempre lleva el color de su animal; el estado lo dice la etiqueta, no el fondo.
-    return el('article', { class: `fila-animal fila-animal--${sit}`, style: `--color-animal: var(--${id}-fuerte); background: var(--${id}-claro)` },
-      el('div', { class: 'fila-animal__quien' },
-        cuadroCara(id, 46, 34, '#ffffff'),
-        el('div', {},
-          el('h3', { class: 'fila-animal__nombre' }, nombre),
-          el('p', { class: 'fila-animal__parte' }, parte))),
-      el('div', { class: 'fila-animal__estado' },
-        el('span', { class: `estado estado--${sit}` }, icono(iconoEstado, 14, 2.6), etiqueta),
-        el('span', { class: 'fila-animal__detalle' }, textoDetalle(id))),
-      el('div', { class: 'partitura', role: 'img', 'aria-label': `${nombre}: tocó en ${tocadas} de los últimos ${CELDAS} segundos` },
-        celdas.map((c) => {
-          if (c?.tipo === 'sin') return el('span', { class: 'celda celda--sin' }, '×');
-          if (c?.tipo !== 'toque') return el('span', { class: 'celda' });
-          return el('span', { class: 'celda celda--toque' }, c.texto ?? '');
-        })));
-  }));
+    const etiqueta = `${f.nombre}: tocó en ${tocadas} de los últimos ${CELDAS} segundos`;
+    if (f.partitura.getAttribute('aria-label') !== etiqueta) f.partitura.setAttribute('aria-label', etiqueta);
+  }
 }
 
 function pintarAlerta() {
@@ -270,9 +328,13 @@ function pintarAlerta() {
   }
   const primero = fuera[0];
   const desde = estado.animales[primero.id].desconectadoDesde;
-  $('alerta-cara').replaceChildren(cara(primero.id, 34));
+  const cuando = desde ? ` ${haceCuanto(Date.now() - desde)}` : '';
+  if ($('alerta').dataset.animal !== primero.id) {
+    $('alerta').dataset.animal = primero.id;
+    $('alerta-cara').replaceChildren(cara(primero.id, 34));
+  }
   $('alerta-titulo').textContent = fuera.length === 1
-    ? `${primero.id === 'ranita' ? 'La' : 'El'} ${primero.nombre} se desconectó ${haceCuanto(Date.now() - desde)}`
+    ? desde ? `${primero.id === 'ranita' ? 'La' : 'El'} ${primero.nombre} se desconectó${cuando}` : `${primero.id === 'ranita' ? 'La' : 'El'} ${primero.nombre} está sin señal`
     : `Se desconectaron: ${fuera.map((a) => a.nombre).join(' y ')}`;
   $('alerta-ayuda').textContent = primero.id === 'osito'
     ? 'Revisa que el osito esté encendido y conectado a la laptop.'
@@ -305,40 +367,56 @@ function pintarCancionElegida() {
 
 let claveConexion = '';
 function pintarConexion() {
-  panel.conexion(estado.ws === 'ensayo' || (estado.ws === 'conectado' && estado.internet && estado.animales.osito.conectado === true));
-  const ahora = Date.now();
-  let tipo;
-  let valor;
-  let ayuda;
-  let sinRed = false;
+  const ensayo = estado.ws === 'ensayo';
+  const osito = estado.animales.osito.conectado;
+  panel.conexion(ensayo || (estado.ws === 'conectado' && estado.internet && osito === true));
+  const hayServidor = ensayo || estado.ws === 'conectado';
+  const hayBroker = hayServidor && estado.broker;
+  const hayOsito = hayBroker && estado.internet && osito === true;
+  const otros = ANIMALES.filter(({ id }) => id !== 'osito');
+  const cuantos = otros.filter(({ id }) => estado.animales[id].conectado === true).length;
 
-  if (estado.ws === 'sin-conexion' || estado.ws === 'conectando') {
-    tipo = 'aviso'; sinRed = true;
-    valor = 'Sin conexión con Node-RED';
-    ayuda = 'Reintentando… la música del osito no se detiene';
-  } else if (!estado.internet) {
-    tipo = 'aviso'; sinRed = true;
-    valor = 'El osito no está conectado';
-    ayuda = `La música sigue sonando. Guarda hasta 64 eventos y los manda al volver (tenía ${estado.pendientesOsito}).`;
-  } else if (ahora < estado.recuperadoHasta) {
-    tipo = 'bien';
-    valor = 'El osito está de vuelta';
-    ayuda = `Traía ${estado.recuperados} eventos guardados`;
-  } else {
-    tipo = 'bien';
-    valor = 'Broker y osito en línea';
-    ayuda = `${estado.pendientesOsito} eventos pendientes${estado.guardado ? ` · guardado ${haceCuanto(ahora - estado.guardado)}` : ''}`;
-  }
+  // Cada paso depende del anterior: [icono, nombre, situación, palabra]
+  const pasos = [
+    ['pantalla', 'Esta página', 'bien', 'Abierta'],
+    ['servidor', 'Node-RED', hayServidor ? 'bien' : 'mal', hayServidor ? 'Conectado' : 'Reintentando…'],
+    ['wifi', 'Broker', !hayServidor ? 'nose' : hayBroker ? 'bien' : 'mal', !hayServidor ? 'Sin datos' : hayBroker ? 'Conectado' : 'Desconectado'],
+    ['osito', 'Osito', !hayBroker || osito === null ? 'nose' : hayOsito ? 'bien' : 'mal', !hayBroker || osito === null ? 'Sin datos' : hayOsito ? 'En línea' : 'Desconectado'],
+    ['nota', 'Animales', !hayOsito ? 'nose' : cuantos === otros.length ? 'bien' : 'aviso', !hayOsito ? 'Sin datos' : `${cuantos} de ${otros.length} conectados`],
+  ];
+  const ahora = Date.now();
+  let resumen;
+  if (!hayServidor) resumen = 'Se perdió Node-RED. La música del osito sigue.';
+  else if (!hayBroker) resumen = 'El broker no responde. La música del osito sigue.';
+  else if (osito === null) resumen = 'Esperando noticias del osito.';
+  else if (!hayOsito) resumen = `El osito está sin red: la música sigue y guarda hasta 64 eventos (tenía ${estado.pendientesOsito}).`;
+  else if (ahora < estado.recuperadoHasta) resumen = `El osito volvió con ${estado.recuperados} eventos guardados.`;
+  else if (cuantos < otros.length) resumen = `Falta: ${otros.filter(({ id }) => estado.animales[id].conectado !== true).map((a) => a.nombre).join(', ')}.`;
+  else resumen = 'Todo conectado.';
+  ponerTexto($('conexion-aviso'), resumen);
+
+  const hora = estado.guardado ? new Date(estado.guardado).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : '—';
+  const r = estado.respuesta;
+  const lenta = r !== null && r > RESPUESTA_LENTA_MS;
+  const datos = [
+    ['Por guardar', hayOsito ? `${estado.pendientesOsito} eventos` : '—'],
+    ['Último guardado', hora],
+    ['Respuesta del osito', r === null ? 'toca una tecla' : `${(r / 1000).toFixed(1)} s · ${lenta ? 'lenta' : 'buena'}`],
+  ];
+  const bien = pasos.every(([, , sit]) => sit === 'bien');
 
   // Solo se vuelve a dibujar si cambió, para no perder el foco del botón.
-  const clave = [tipo, valor, ayuda].join('|');
+  const clave = JSON.stringify([pasos, resumen, datos, estado.internet]);
   if (clave === claveConexion) return;
   claveConexion = clave;
 
-  const tarjeta = el('div', { class: `conexion conexion--${tipo}` },
-    el('div', { class: 'conexion__fila' },
-      el('div', { class: 'conexion__icono' }, icono(sinRed ? 'wifiTachado' : 'wifi', 20)),
-      el('div', {}, el('p', { class: 'conexion__valor' }, valor), el('p', { class: 'conexion__ayuda' }, ayuda))));
+  const tarjeta = el('div', { class: `conexion conexion--${bien ? 'bien' : 'aviso'}` },
+    el('p', { class: 'conexion__valor' }, resumen),
+    el('ol', { class: 'camino' }, pasos.map(([dib, nombre, sit, palabra]) => el('li', { class: `camino__paso camino__paso--${sit}` },
+      el('span', { class: 'camino__icono' }, dib === 'osito' ? cara('osito', 22) : icono(dib, 18)),
+      el('span', { class: 'camino__nombre' }, nombre),
+      el('span', { class: 'camino__estado' }, icono({ bien: 'palomita', mal: 'tache', aviso: 'linea', nose: 'duda' }[sit], 14, 3), palabra)))),
+    el('dl', { class: 'conexion__datos' }, datos.map(([t, v]) => el('div', {}, el('dt', {}, t), el('dd', {}, v)))));
 
   // El botón para simular la caída solo existe en ensayo: en la demo real se apaga el router.
   if (esEnsayo()) {
@@ -383,7 +461,15 @@ async function elegirModo(modo, cancion) {
   pintarModos();
   try {
     const { id } = await pedirModo(modo, cancion);
-    if (estado.pendiente) estado.pendiente.id = id;
+    if (!estado.pendiente) return;
+    if (acks.has(id)) { // el acuse llegó antes que esta respuesta
+      if (acks.get(id)) anotarRespuesta(Date.now() - estado.pendiente.desde);
+      else estado.sinRespuesta = true;
+      estado.pendiente = null;
+      pintarModos();
+      return;
+    }
+    estado.pendiente.id = id;
   } catch (error) {
     console.error('[en-vivo] No se pudo pedir el cambio de modo:', error);
     estado.pendiente = null;
@@ -457,7 +543,9 @@ function prepararAcciones() {
 
 // ---------- Arranque ----------
 
-const panel = crearPanel($('panel'));
+const panel = crearPanel($('panel'), anotarRespuesta);
+for (const animal of ANIMALES) filas[animal.id] = crearFila(animal);
+$('filas').replaceChildren(...ANIMALES.map(({ id }) => filas[id].fila));
 iniciarPagina();
 prepararAcciones();
 cargarCanciones();

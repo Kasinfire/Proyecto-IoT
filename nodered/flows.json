@@ -454,15 +454,12 @@
         "orq_wsout"
       ],
       [
-        "orq_espera"
-      ],
-      [
         "orq_out"
       ]
     ],
     "name": "API",
-    "func": "const metodo = msg.req.method;\n// Otro sitio abierto en el navegador no puede mandar JSON aquí sin permiso.\nif (metodo === 'POST' && !msg.req.is('application/json')) {\n  msg.statusCode = 415;\n  msg.payload = { error: 'se espera JSON' };\n  return [msg, null, null];\n}\nconst r = global.get('orquesta').alHttp(metodo, msg.req.path.replace('/api/', ''), msg.payload);\nmsg.statusCode = r.codigo;\nmsg.headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };\nmsg.payload = r.codigo === 204 ? '' : JSON.stringify(r.cuerpo);\nnode.send([msg, null, null]);\nfor (const m of r.ws) node.send([null, { payload: JSON.stringify(m) }, null]);\n// Una tecla sale de inmediato; un modo espera a que la pantalla conozca su id.\nfor (const m of r.mqtt) {\n  const pub = { topic: m.topic, payload: m.payload };\n  node.send(r.urgente ? [null, null, null, pub] : [null, null, pub, null]);\n}\nreturn null;",
-    "outputs": 4,
+    "func": "const metodo = msg.req.method;\n// Otro sitio abierto en el navegador no puede mandar JSON aquí sin permiso.\nif (metodo === 'POST' && !msg.req.is('application/json')) {\n  msg.statusCode = 415;\n  msg.payload = { error: 'se espera JSON' };\n  return [msg, null, null];\n}\nconst r = global.get('orquesta').alHttp(metodo, msg.req.path.replace('/api/', ''), msg.payload);\nmsg.statusCode = r.codigo;\nmsg.headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };\nmsg.payload = r.codigo === 204 ? '' : JSON.stringify(r.cuerpo);\nnode.send([msg, null, null]);\nfor (const m of r.ws) node.send([null, { payload: JSON.stringify(m) }, null]);\nfor (const m of r.mqtt) node.send([null, null, { topic: m.topic, payload: m.payload }]);\nreturn null;",
+    "outputs": 3,
     "timeout": 0,
     "noerr": 0,
     "initialize": "",
@@ -479,31 +476,6 @@
     "name": "",
     "statusCode": "",
     "headers": {}
-  },
-  {
-    "id": "orq_espera",
-    "type": "delay",
-    "z": "orq_flujo",
-    "x": 700,
-    "y": 740,
-    "wires": [
-      [
-        "orq_out"
-      ]
-    ],
-    "name": "la respuesta HTTP llega primero",
-    "pauseType": "delay",
-    "timeout": "150",
-    "timeoutUnits": "milliseconds",
-    "rate": "1",
-    "nbRateUnits": "1",
-    "rateUnits": "second",
-    "randomFirst": "1",
-    "randomLast": "5",
-    "randomUnits": "seconds",
-    "drop": false,
-    "allowrate": false,
-    "outputs": 1
   },
   {
     "id": "orq_http20",
@@ -703,5 +675,41 @@
     "method": "post",
     "upload": false,
     "swaggerDoc": ""
+  },
+  {
+    "id": "orq_estado_mqtt",
+    "type": "status",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 40,
+    "wires": [
+      [
+        "orq_broker_estado"
+      ]
+    ],
+    "name": "conexión con el broker",
+    "scope": [
+      "orq_in0"
+    ]
+  },
+  {
+    "id": "orq_broker_estado",
+    "type": "function",
+    "z": "orq_flujo",
+    "x": 400,
+    "y": 40,
+    "wires": [
+      [
+        "orq_wsout"
+      ]
+    ],
+    "name": "broker",
+    "func": "// Verde = conectado; amarillo es reintentando.\nconst r = global.get('orquesta').alBroker(msg.status.fill === 'green');\nfor (const m of r.ws) node.send({ payload: JSON.stringify(m) });\nreturn null;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": []
   }
 ]

@@ -47,7 +47,7 @@ Un mensaje JSON por evento, ya descifrado:
 | `canciones` | `{"tipo":"canciones"}` | Cambió la lista: volver a pedirla |
 | `grabacion` | `{"tipo":"grabacion","activa":true,"notas":5}` | Avance de la grabación del gatito |
 | `cancion` | `{"tipo":"cancion","progreso":0.4}` | Avance de la canción, 0 a 1 (opcional) |
-| `red` | `{"tipo":"red","internet":false,"pendientes":37}` y al volver `{"tipo":"red","internet":true,"pendientes":0,"recuperados":37,"guardado":1795470500000}` | Estado del internet y del buffer del osito |
+| `red` | `{"tipo":"red","internet":false,"pendientes":37}` y al volver `{"tipo":"red","internet":true,"pendientes":0,"recuperados":37,"guardado":1795470500000}` | Estado del osito y de su buffer. `broker:false` = Node-RED perdió el broker y todo pasa a `conectado:null` |
 
 ### Rutas HTTP (interfaz → Node-RED, Request/Response)
 
@@ -63,8 +63,8 @@ Un mensaje JSON por evento, ya descifrado:
 | `POST /api/canciones/arreglar` | canción | `{"partes":…,"pulso_ms":…}` | Las cuatro partes, para oírla antes de guardar |
 | `POST /api/canciones/grabar` | `{"accion":"empezar"}`, `terminar` o `cancelar` | `204` o `{"melodia":…}` | Graba el gatito en Libre |
 | `GET /api/canciones` | — | `[{"nombre":"Estrellita","tipo":"tranquilas","duracion":"1:20"}]` | `tipo`: `tranquilas`, `alegres`, `navidad` o `cumpleanos` |
-| `GET /api/ninos` | — | `[{"alias":"A-07","sesiones":6,"simon_pct":75,"favorito":"gatito","en_sesion":true}]` | |
-| `POST /api/ninos` | `{"alias":"D-04","nombre":"…"}` | `{"alias":"D-04"}` | Basta uno de los dos; sin alias se pone el siguiente libre. El nombre se queda en la laptop |
-| `POST /api/ninos/editar` | `{"alias":"D-04","nuevo_alias":"D-05","nombre":"…"}` | `{"alias":"D-05"}` | Su historial se conserva |
+| `GET /api/ninos` | — | `[{"alias":"A-07","sesiones":6,"simon_pct":75,"favorito":"gatito","avatar":null,"en_sesion":true}]` | `avatar` es `null` si no le han hecho uno |
+| `POST /api/ninos` | `{"alias":"D-04","nombre":"…","avatar":{…}}` | `{"alias":"D-04"}` | `avatar` es opcional: los ids de `avatar.js`. Basta uno de los dos; sin alias se pone el siguiente libre. El nombre se queda en la laptop |
+| `POST /api/ninos/editar` | `{"alias":"D-04","nuevo_alias":"D-05","nombre":"…","avatar":{…}}` | `{"alias":"D-05"}` | Sin `avatar` se queda el que tenía. Su historial se conserva |
 | `POST /api/ninos/borrar` | `{"alias":"D-04"}` | `204` | Borra también sus sesiones. No si está en sesión |
 | `GET /api/historial?alias=A-07&periodo=mes` | — | `{"sesiones":[{"fecha":"2026-11-20","modos":["cancion","simon"],"minutos":18,"cancion":"Estrellita","gestos":299,"simon":[9,12],"aviso":"Pollito se desconectó"}],"reparto":{"gatito":742,"ranita":510,"pollito":288}}` | Consulta Supabase; `periodo`: `mes`, `trimestre` o `todo` |

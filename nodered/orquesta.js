@@ -6,6 +6,7 @@
 const crypto = require('node:crypto');
 const { AlmacenArchivo } = require('./almacen.js');
 const arreglo = require('./arreglo.js');
+const { leerAvatar } = require('./avatar.js');
 const { PULSO_MS: PULSO_GRABACION_MS, aMelodia } = require('./grabacion.js');
 
 const NODOS = ['osito', 'ranita', 'gatito', 'pollito'];
@@ -81,6 +82,8 @@ class Orquesta {
       modo: 'cancion', cancion: INCLUIDAS[0].id, canciones: [], siguienteCarga: 1, sync: { arranque: null, hasta: 0, recibidos: [] },
     };
     this.conectado = {};
+    this.desconectadoDesde = {};
+    this.broker = null; // null = todavía no se sabe
     this.ultimoGesto = {};
     this.sombra = 0;
     this.volumen = null;
@@ -154,8 +157,38 @@ class Orquesta {
     } else if (this.conectado[nodo] !== false && !conectado && this.datos.sesion) {
       this.datos.sesion.aviso = `${nodo[0].toUpperCase()}${nodo.slice(1)} se desconectó`;
     }
+    // Lo que ya estaba fuera al arrancar Node-RED no se sabe desde cuándo.
+    if (!conectado && this.conectado[nodo] === true) this.desconectadoDesde[nodo] = this.ahora();
+    if (conectado) delete this.desconectadoDesde[nodo];
     this.conectado[nodo] = conectado;
-    salida.ws.push({ tipo: 'estado', nodo, conectado: this.estadoDe(nodo) });
+    salida.ws.push(this.mensajeEstado(nodo));
+  }
+
+  mensajeEstado(nodo) {
+    const msg = { tipo: 'estado', nodo, conectado: this.estadoDe(nodo) };
+    if (msg.conectado === false && this.desconectadoDesde[nodo]) msg.desde = this.desconectadoDesde[nodo];
+    return msg;
+  }
+
+  // Node-RED perdió o recuperó el broker. Sin broker no se sabe nada del osito ni de los animales;
+  // al volver, el broker manda lo retenido.
+  alBroker(conectado) {
+    const salida = { ws: [], mqtt: [] };
+    if (this.broker === conectado) return salida;
+    this.broker = conectado;
+    if (!conectado) {
+      this.conectado = {};
+      this.desconectadoDesde = {};
+      this.ositoEnLinea = null;
+      this.volvioEn = null;
+      salida.ws.push(...NODOS.map((nodo) => ({ tipo: 'estado', nodo, conectado: null })));
+    }
+    salida.ws.push(this.red());
+    return salida;
+  }
+
+  sinOsito() {
+    return this.broker === false ? 'no hay conexión con el broker' : 'el osito no está en línea';
   }
 
   // null = no se sabe (el osito no está en línea).
@@ -178,7 +211,7 @@ class Orquesta {
   }
 
   red(volvio = false) {
-    const msg = { tipo: 'red', internet: this.ositoEnLinea !== false && this.volvioEn === null, pendientes: this.pendientes };
+    const msg = { tipo: 'red', internet: this.broker !== false && this.ositoEnLinea !== false && this.volvioEn === null, pendientes: this.pendientes, broker: this.broker !== false };
     if (volvio) msg.recuperados = this.pendientes;
     if (this.guardado) msg.guardado = this.guardado;
     return msg;
@@ -445,7 +478,7 @@ class Orquesta {
   alConectar() {
     const ws = [this.mensajeSesion()];
     for (const nodo of NODOS) {
-      if (nodo in this.conectado) ws.push({ tipo: 'estado', nodo, conectado: this.estadoDe(nodo) });
+      if (nodo in this.conectado) ws.push(this.mensajeEstado(nodo));
     }
     ws.push(this.red());
     if (this.panel && this.ositoEnLinea) ws.push(this.panel);
@@ -466,8 +499,8 @@ class Orquesta {
     if (s && !s.modos.includes(modo)) s.modos.push(modo);
   }
 
-  // { codigo, cuerpo, ws, mqtt }. El MQTT se publica después de responder: así la pantalla ya
-  // conoce el id cuando llega la confirmación del osito.
+  // { codigo, cuerpo, ws, mqtt }. El MQTT sale enseguida: la pantalla recuerda los acuses que lleguen
+  // antes que su id.
   alHttp(metodo, ruta, datos = {}) {
     const resp = (codigo, cuerpo = null, ws = [], mqtt = []) => ({ codigo, cuerpo, ws, mqtt });
     const error = (codigo, texto) => resp(codigo, { error: texto });
@@ -483,7 +516,7 @@ class Orquesta {
           // Si ya es la que tiene el osito, no hace falta mandarla otra vez.
           if (cancion.id !== this.datos.cancion || this.cancionCambiada) pedido.cancion = cancion.id;
         }
-        if (!this.ositoEnLinea) return error(503, 'el osito no está en línea');
+        if (!this.ositoEnLinea) return error(503, this.sinOsito());
         this.datos.siguienteId += 1;
         this.pedidos.set(pedido.id, pedido.cancion);
         // Una canción propia se manda primero; el modo, cuando el osito confirme que llegó completa.
@@ -495,7 +528,7 @@ class Orquesta {
       }
       case 'POST aviso':
         if (typeof cuerpo.silenciar !== 'boolean') return error(400, 'falta silenciar');
-        if (!this.ositoEnLinea) return error(503, 'el osito no está en línea');
+        if (!this.ositoEnLinea) return error(503, this.sinOsito());
         this.datos.avisoSilenciado = cuerpo.silenciar;
         this.guardar();
         return resp(204, null, [], [{ topic: 'orquesta/control/aviso', payload: JSON.stringify({ silenciar: cuerpo.silenciar }) }]);
@@ -557,7 +590,7 @@ class Orquesta {
       }
       case 'POST canciones/grabar': {
         if (cuerpo.accion === 'empezar') {
-          if (!this.ositoEnLinea) return error(503, 'el osito no está en línea');
+          if (!this.ositoEnLinea) return error(503, this.sinOsito());
           if (this.conectado.gatito !== true) return error(409, 'el gatito no está conectado');
           if (this.datos.modo !== 'libre') return error(409, 'pon el osito en modo Libre');
           this.grabacion = { desde: this.ahora(), toques: [], llena: false };
@@ -574,8 +607,8 @@ class Orquesta {
       case 'POST tecla': {
         const { tecla } = cuerpo;
         if (typeof tecla !== 'string' || tecla.length !== 1 || !TECLAS.includes(tecla)) return error(400, 'tecla desconocida');
-        if (!this.ositoEnLinea) return error(503, 'el osito no está en línea');
-        return { ...resp(204, null, [], [{ topic: 'orquesta/control/tecla', payload: JSON.stringify({ tecla }) }]), urgente: true };
+        if (!this.ositoEnLinea) return error(503, this.sinOsito());
+        return resp(204, null, [], [{ topic: 'orquesta/control/tecla', payload: JSON.stringify({ tecla }) }]);
       }
       case 'GET ninos':
         return resp(200, this.datos.ninos.map((n) => this.fichaNino(n.alias)));
@@ -587,7 +620,12 @@ class Orquesta {
         const alias = sinAlias ? this.aliasLibre() : normalizarAlias(cuerpo.alias);
         if (!alias) return error(400, 'el alias debe ser como A-07');
         if (this.nino(alias)) return error(409, `ya existe un niño con el alias ${alias}`);
-        this.datos.ninos.push({ alias, nombre });
+        const nino = { alias, nombre };
+        if (cuerpo.avatar !== undefined) {
+          nino.avatar = leerAvatar(cuerpo.avatar);
+          if (!nino.avatar) return error(400, 'ese avatar no es válido');
+        }
+        this.datos.ninos.push(nino);
         this.guardar();
         return resp(200, { alias });
       }
@@ -600,9 +638,13 @@ class Orquesta {
         if (!nuevo) return error(400, 'el alias debe ser como A-07');
         const otro = this.nino(nuevo);
         if (otro && otro !== nino) return error(409, `ya existe un niño con el alias ${nuevo}`);
+        // Si no viene, se queda el que tenía.
+        const avatar = cuerpo.avatar === undefined ? nino.avatar : leerAvatar(cuerpo.avatar);
+        if (avatar === null) return error(400, 'ese avatar no es válido');
         const viejo = nino.alias;
         nino.alias = nuevo;
         nino.nombre = nombre;
+        if (avatar) nino.avatar = avatar;
         for (const sesion of this.datos.sesiones) if (sesion.alias === viejo) sesion.alias = nuevo;
         const abierta = this.datos.sesion?.alias === viejo;
         if (abierta) this.datos.sesion.alias = nuevo;
@@ -658,7 +700,7 @@ class Orquesta {
     const favorito = Object.entries(this.reparto(sesiones)).sort((a, b) => b[1] - a[1])[0];
     return {
       alias, nombre: this.nino(alias)?.nombre ?? '', sesiones: sesiones.length, simon_pct: turnos ? Math.round((aciertos * 100) / turnos) : null,
-      favorito: favorito ? favorito[0] : null, en_sesion: this.datos.sesion?.alias === alias,
+      favorito: favorito ? favorito[0] : null, avatar: this.nino(alias)?.avatar ?? null, en_sesion: this.datos.sesion?.alias === alias,
     };
   }
 

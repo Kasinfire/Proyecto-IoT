@@ -7,7 +7,7 @@ const NEGRO = '#1c1c1a';
 const ROSA = '#f08fae';
 
 // Cada fila es una línea de píxeles; cada letra, un color. "." es transparente.
-const DIBUJOS = {
+export const DIBUJOS = {
   osito: {
     filas: ['.BB......BB.', 'BbbB....BbbB', 'BBBBBBBBBBBB', 'BBBBBBBBBBBB', 'BBkkBBBBkkBB', 'BBkkBBBBkkBB',
       'BpBBmmmmBBpB', 'BBBmmkkmmBBB', 'BBBmmmmmmBBB', 'BBBBmkkmBBBB', 'BBBBBBBBBBBB', '.BBBBBBBBBB.'],

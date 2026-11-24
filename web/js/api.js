@@ -114,20 +114,20 @@ export function obtenerNinos() {
 }
 
 // Alias vacío: Node-RED pone el siguiente libre. El nombre es opcional y se queda en la laptop.
-export function agregarNino(alias, nombre) {
+export function agregarNino(alias, nombre, avatar) {
   if (esEnsayo()) {
-    ensayo.NINOS.push({ alias: alias || `N-0${ensayo.NINOS.length + 1}`, nombre, sesiones: 0, simon_pct: null, favorito: null, en_sesion: false });
+    ensayo.NINOS.push({ alias: alias || `N-0${ensayo.NINOS.length + 1}`, nombre, avatar, sesiones: 0, simon_pct: null, favorito: null, en_sesion: false });
     return Promise.resolve(null);
   }
-  return enviar('/api/ninos', { alias, nombre });
+  return enviar('/api/ninos', { alias, nombre, avatar });
 }
 
-export function editarNino(alias, nuevoAlias, nombre) {
+export function editarNino(alias, nuevoAlias, nombre, avatar) {
   if (esEnsayo()) {
-    Object.assign(ensayo.NINOS.find((n) => n.alias === alias), { alias: nuevoAlias, nombre });
+    Object.assign(ensayo.NINOS.find((n) => n.alias === alias), { alias: nuevoAlias, nombre, avatar });
     return Promise.resolve(null);
   }
-  return enviar('/api/ninos/editar', { alias, nuevo_alias: nuevoAlias, nombre });
+  return enviar('/api/ninos/editar', { alias, nuevo_alias: nuevoAlias, nombre, avatar });
 }
 
 export function borrarNino(alias) {

@@ -204,7 +204,7 @@ test('sesión completa: gestos, Simón, historial y ficha', () => {
   assert.strictEqual(h.sesiones[0].gestos, 4);
   assert.strictEqual(h.sesiones[0].minutos, 10);
   assert.deepStrictEqual(h.sesiones[0].simon, [1, 2]);
-  assert.deepStrictEqual(o.alHttp('GET', 'ninos').cuerpo, [{ alias: 'B-12', nombre: '', sesiones: 1, simon_pct: 50, favorito: 'ranita', en_sesion: false }]);
+  assert.deepStrictEqual(o.alHttp('GET', 'ninos').cuerpo, [{ alias: 'B-12', nombre: '', sesiones: 1, simon_pct: 50, favorito: 'ranita', avatar: null, en_sesion: false }]);
   reloj.t += 40 * 86400000;
   assert.strictEqual(o.alHttp('GET', 'historial', { alias: 'B-12', periodo: 'mes' }).cuerpo.sesiones.length, 0);
   assert.strictEqual(o.alHttp('GET', 'historial', { alias: 'B-12', periodo: 'todo' }).cuerpo.sesiones.length, 1);
@@ -306,7 +306,7 @@ test('panel y teclas', () => {
   enLinea(o);
   for (const t of ['z', '', '12', 8, null]) assert.strictEqual(o.alHttp('POST', 'tecla', { tecla: t }).codigo, 400);
   const r = o.alHttp('POST', 'tecla', { tecla: 'd' });
-  assert.deepStrictEqual([r.codigo, r.urgente, r.mqtt[0].payload], [204, true, '{"tecla":"d"}']);
+  assert.deepStrictEqual([r.codigo, r.mqtt[0].payload], [204, '{"tecla":"d"}']);
   assert.deepStrictEqual(o.alMqtt('orquesta/osito/tecla', '{"tecla":"#"}').ws, [{ tipo: 'tecla', tecla: '#' }]);
   assert.deepStrictEqual(o.alMqtt('orquesta/osito/tecla', '{"tecla":"<"}').ws, []);
   const w = o.alMqtt('orquesta/osito/panel', '{"tempo":110,"eco":true,"ritmo":"pop","acordes":false,"loop":"sonando","capas":2,"callados":8,"nivel":3,"avance":45}').ws;

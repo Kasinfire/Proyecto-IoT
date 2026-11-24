@@ -167,16 +167,11 @@
 /* ---------- Avisos ---------- */
 
 .alerta {
-  position: fixed;
-  z-index: 30;
-  /* Debajo del encabezado, a la derecha: no tapa el menú ni la orquesta */
-  top: 104px;
-  right: clamp(16px, 3vw, 56px);
-  width: min(600px, calc(100vw - 32px));
+  width: min(600px, 100%);
   padding: 12px 12px 12px 14px;
   border-radius: 20px;
   background: #ffffff;
-  box-shadow: 0 0 0 1px rgb(28 28 26 / 6%), 0 16px 40px rgb(28 28 26 / 18%);
+  box-shadow: 0 0 0 2px var(--alerta-fondo);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -532,4 +527,10 @@ textarea.entrada {
     order: 3;
     width: 100%;
   }
+}
+
+@media (max-width: 560px) {
+  .alerta { flex-wrap: wrap; }
+  .alerta__texto { flex: 1 1 180px; }
+  .alerta__acciones { width: 100%; justify-content: space-between; }
 }
