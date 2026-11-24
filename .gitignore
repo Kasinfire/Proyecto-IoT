@@ -1,6 +1,7 @@
 .secrets/
 *.env
 broker/passwd
+broker/mosquitto.db
 
 certs/*.key
 certs/*.srl

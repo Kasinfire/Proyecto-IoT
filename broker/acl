@@ -1,0 +1,32 @@
+# Osito: solo suscripciones de control y publicaciones propias.
+user osito
+topic read orquesta/control/modo
+topic read orquesta/sync/ack
+topic read orquesta/control/aviso
+topic write orquesta/ranita/evento
+topic write orquesta/gatito/evento
+topic write orquesta/pollito/evento
+topic write orquesta/ranita/estado
+topic write orquesta/gatito/estado
+topic write orquesta/pollito/estado
+topic write orquesta/osito/estado
+topic write orquesta/osito/evento
+topic write orquesta/osito/volumen
+topic write orquesta/osito/cola
+topic write orquesta/control/modo/ack
+
+# Node-RED: lee telemetría y publica comandos/acuse; credencial distinta a la del osito.
+user nodered
+topic read orquesta/ranita/evento
+topic read orquesta/gatito/evento
+topic read orquesta/pollito/evento
+topic read orquesta/ranita/estado
+topic read orquesta/gatito/estado
+topic read orquesta/pollito/estado
+topic read orquesta/osito/estado
+topic read orquesta/osito/evento
+topic read orquesta/osito/volumen
+topic read orquesta/osito/cola
+topic read orquesta/control/modo/ack
+topic write orquesta/control/#
+topic write orquesta/sync/#

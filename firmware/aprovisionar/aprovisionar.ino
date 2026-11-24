@@ -1,6 +1,6 @@
-// Guarda en NVS las claves y datos del enlace ESP-NOW, para que no estén en el código.
-// Se sube una vez a cada placa, se escriben los comandos en el Monitor Serie (115200,
-// "New Line") y después se sube el firmware del animal. La NVS no se borra al subir otro sketch.
+// Guarda en NVS los datos de ESP-NOW y, en el osito, Wi-Fi/MQTTS; nunca quedan en el código.
+// Se sube una vez a cada placa y se escriben los comandos por Monitor Serie (115200, "New Line").
+// La NVS no se borra al subir otro sketch. Usa los secretos locales de .secrets/mqtt.env.
 //
 // Las claves se generan una vez con `python3 -c "import secrets; print(secrets.token_hex(16))"`
 // y se guardan en .secrets/ (no se sube al repo), nunca en el código.
@@ -9,10 +9,15 @@
 //   clave_ranita=<32 hex>         la ranita y el osito (igual clave_gatito, clave_pollito)
 //   mac_osito=AA:BB:CC:DD:EE:FF   solo animales: la MAC que imprime este sketch en el osito
 //   canal=<1-13>                  solo animales: el canal Wi-Fi del router del osito
+//   wifi_ssid=...                 solo osito: SSID (espacios permitidos)
+//   wifi_password=...             solo osito: clave Wi-Fi
+//   broker_host=...               solo osito: IP/DNS incluido en el SAN del certificado
+//   mqtt_user=... / mqtt_password=...   solo osito: credencial MQTTS dedicada
+//   mqtt_aes_key=<32 hex>         solo osito: clave AES-128-GCM MQTT
 //   ver                           qué hay guardado (sin mostrar las claves)
-//   borrar                        borra todo
+//   borrar                        borra enlace y datos de MQTTS
 #include <Preferences.h>
-#include <WiFi.h>
+#include <esp_mac.h>
 
 namespace {
 constexpr uint32_t BAUDIOS = 115200;
@@ -21,13 +26,15 @@ constexpr size_t CLAVE_BYTES = 16;
 constexpr size_t MAC_BYTES = 6;
 constexpr uint8_t CANAL_MIN = 1;
 constexpr uint8_t CANAL_MAX = 13;
-constexpr size_t LINEA_MAX = 64;
+constexpr size_t LINEA_MAX = 128;
 
 const char* const CLAVES[] = {"clave_grupo", "clave_ranita", "clave_gatito", "clave_pollito"};
+const char* const DATOS_MQTT[] = {"ssid", "wifi_pass", "host", "user", "mqtt_pass", "aes_key"};
 
 char linea[LINEA_MAX];
 size_t largo = 0;
 Preferences nvs;
+Preferences nvs_mqtt;
 
 int valorHex(char c) {
   if (c >= '0' && c <= '9')
@@ -77,6 +84,10 @@ void ver() {
     Serial.println("  mac_osito      -");
   }
   Serial.printf("  canal          %u\n", nvs.getUChar("canal", 1));
+  Serial.println("  MQTTS (osito):");
+  for (const char* clave : DATOS_MQTT) {
+    Serial.printf("  %-14s %s\n", clave, nvs_mqtt.isKey(clave) ? "guardada" : "-");
+  }
 }
 
 void procesar(char* texto) {
@@ -86,7 +97,8 @@ void procesar(char* texto) {
   }
   if (strcmp(texto, "borrar") == 0) {
     nvs.clear();
-    Serial.println("Borrado.");
+    nvs_mqtt.clear();
+    Serial.println("Borrados datos de enlace y MQTTS.");
     return;
   }
 
@@ -120,6 +132,23 @@ void procesar(char* texto) {
       return;
     }
     nvs.putUChar(nombre, canal);
+  } else if (strcmp(nombre, "wifi_ssid") == 0) {
+    nvs_mqtt.putString("ssid", valor);
+  } else if (strcmp(nombre, "wifi_password") == 0) {
+    nvs_mqtt.putString("wifi_pass", valor);
+  } else if (strcmp(nombre, "broker_host") == 0) {
+    nvs_mqtt.putString("host", valor);
+  } else if (strcmp(nombre, "mqtt_user") == 0) {
+    nvs_mqtt.putString("user", valor);
+  } else if (strcmp(nombre, "mqtt_password") == 0) {
+    nvs_mqtt.putString("mqtt_pass", valor);
+  } else if (strcmp(nombre, "mqtt_aes_key") == 0) {
+    uint8_t clave[16];
+    if (!leerHex(valor, clave, sizeof(clave))) {
+      Serial.println("La clave MQTT debe ser de 32 caracteres hex (16 bytes).");
+      return;
+    }
+    nvs_mqtt.putBytes("aes_key", clave, sizeof(clave));
   } else {
     Serial.printf("No conozco '%s'.\n", nombre);
     return;
@@ -130,10 +159,15 @@ void procesar(char* texto) {
 
 void setup() {
   Serial.begin(BAUDIOS);
-  WiFi.mode(WIFI_STA);  // para que la MAC sea la que usa ESP-NOW
   nvs.begin(ESPACIO_NVS, false);
-  Serial.printf("\nAprovisionamiento del enlace. MAC de esta placa: %s\n",
-                WiFi.macAddress().c_str());
+  nvs_mqtt.begin("mqtt", false);
+  // Se lee de los eFuse: WiFi.macAddress() da ceros si el Wi-Fi todavía no termina de arrancar.
+  // Es la MAC de estación, la misma que usa ESP-NOW.
+  uint8_t mac[MAC_BYTES];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  Serial.printf(
+      "\nAprovisionamiento del enlace. MAC de esta placa: %02X:%02X:%02X:%02X:%02X:%02X\n", mac[0],
+      mac[1], mac[2], mac[3], mac[4], mac[5]);
   ver();
 }
 
