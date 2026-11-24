@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Historial · Orquesta</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/componentes.css">
+<link rel="stylesheet" href="css/pantallas.css">
+</head>
+<body>
+<div class="pagina">
+
+<header class="encabezado">
+  <div class="marca"><div class="marca__logo" data-logo></div><p>Orquesta<span>Kids</span></p></div>
+  <nav class="menu" aria-label="Secciones">
+    <a href="en-vivo.html">En vivo</a>
+    <a href="historial.html" aria-current="page">Historial</a>
+    <a href="canciones.html">Canciones</a>
+    <a href="ninos.html">Niños</a>
+  </nav>
+  <div class="encabezado__acciones">
+    <a class="boton boton--sesion" href="en-vivo.html" data-enlace-sesion hidden>Sesión en curso ·<span data-alias></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+  </div>
+</header>
+
+
+<div class="titulo-con-filtros">
+  <div>
+    <h1 class="titulo-pagina">Historial</h1>
+    <p class="texto-ayuda">Cómo ha avanzado cada niño, sesión por sesión</p>
+  </div>
+  <div class="filtros-fila">
+    <div class="campo"><label for="nino">Niño</label><select class="selector" id="nino"></select></div>
+    <div class="campo"><label for="periodo">Periodo</label>
+      <select class="selector" id="periodo">
+        <option value="mes">Último mes</option>
+        <option value="trimestre">Últimos 3 meses</option>
+        <option value="todo">Todo</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="historial">
+  <section class="sesiones" aria-labelledby="t-sesiones">
+    <div class="sesiones__cabeza">
+      <h2 class="titulo-seccion" id="t-sesiones">Sesiones</h2>
+      <span class="texto-ayuda">la más reciente arriba</span>
+    </div>
+    <div id="lista-sesiones" class="sesiones__lista"></div>
+  </section>
+
+  <aside class="historial__lado">
+    <section class="bloque" aria-labelledby="t-avance">
+      <h2 class="titulo-seccion" id="t-avance">Avance en Simón Dice</h2>
+      <div class="avance" id="avance"></div>
+    </section>
+    <section class="bloque" aria-labelledby="t-reparto">
+      <h2 class="titulo-seccion" id="t-reparto">Con quién toca más</h2>
+      <div class="reparto-caja" id="reparto"></div>
+    </section>
+  </aside>
+</div>
+
+</div>
+
+<script type="module" src="js/historial.js"></script>
+</body>
+</html>

@@ -89,7 +89,7 @@ Ranita / Gatito / Pollito --ESP-NOW cifrado (AES-GCM)--> Osito (gateway + direct
                                                             |  MQTTS 8883 (Wi-Fi)
                                                          Mosquitto (laptop)
                                                             |
-                                                         Node-RED --> Dashboard 2.0 (terapeuta)
+                                                         Node-RED --> Interfaz web (terapeuta y proyector)
                                                             |  HTTPS (REST)
                                                          Supabase (nube: historial de sesiones)
 ```
@@ -97,7 +97,7 @@ Ranita / Gatito / Pollito --ESP-NOW cifrado (AES-GCM)--> Osito (gateway + direct
 - **Percepción:** sensores y actuadores de cada animal.
 - **Red:** ESP-NOW entre animales y osito; Wi-Fi solo en el osito.
 - **Middleware:** Mosquitto (en la laptop, configuración de la Práctica 4) + Node-RED. Nube: **Supabase** (Postgres + API REST), donde Node-RED guarda el historial de sesiones.
-- **Aplicación:** dashboard de Node-RED (`@flowfuse/node-red-dashboard`, Dashboard 2.0).
+- **Aplicación:** interfaz web propia (`web/`: HTML, CSS y JavaScript sin dependencias) que sirve Node-RED. Recibe los eventos por WebSocket y pide acciones e historial por HTTP a Node-RED; nunca habla directo con el osito ni con Supabase. Se eligió en lugar de Dashboard 2.0 para poder aplicar el diseño centrado en el usuario de [`docs/diseno/`](docs/diseno/).
 
 ### Edge vs remoto
 - **En el ESP32 (edge):** lectura de sensores, antirrebote, detección de gesto (agitar, sombra, tecla), decisión de qué nota/parte toca, secuencia de la canción, lógica de modos y Simón Dice, LEDs, buffer offline. Justificación: el sonido debe responder en < ~50 ms; si dependiera de la red se sentiría desfasado, y la música debe seguir aunque se caiga el internet.
@@ -198,7 +198,7 @@ Evidencia: apagar el router/hotspot a mitad de una sesión y mostrar que el dash
 
 ## 9. Dashboard y accesibilidad (Unidad 6)
 
-Dashboard 2.0 en Node-RED (`http://<ip-laptop>:1880/dashboard`):
+Interfaz web servida por Node-RED (`http://<ip-laptop>:1880/`), con una pantalla para el terapeuta y otra para el niño en el proyector. La pantalla del terapeuta muestra:
 - Estado de cada animal (conectado, activo ahora).
 - Partitura en vivo: notas tocadas con el color de cada animal.
 - Control: modo (canción / libre / Simón Dice), selección de canción, con indicador de confirmación (ack).
@@ -244,7 +244,9 @@ WCAG a auditar:
   /gatito
   /pollito
   /osito          gateway, secuenciador de canciones, modos, buffer LittleFS, Sintetizador
-/nodered          flows.json (sin claves; usar variables de entorno)
+/nodered          flows.json (sin claves; usar variables de entorno) y el contrato con la interfaz
+/web              interfaz: en-vivo, historial, canciones, ninos, proyector (+ css/, js/, fuentes/)
+/docs/diseno      wireframe, notas de diseño y auditoría WCAG
 /broker           mosquitto.conf, acl (sin contraseñas)
 /certs            generar_certs.sh (sin claves privadas en el repo)
 /herramientas     aprovisionar.py, iniciar_nodered.sh, sintetizador.py

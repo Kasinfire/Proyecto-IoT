@@ -14,10 +14,12 @@ La especificación completa está en [`orquesta-proyecto.md`](orquesta-proyecto.
 | `firmware/osito/` | 🧸 Osito: gateway y director musical |
 | `broker/` | Mosquitto TLS, ACL de mínimo privilegio y password_file ignorado |
 | `certs/` | CA y certificado público del broker; las llaves privadas quedan en `.secrets/` |
-| `nodered/` | Flujos de Node-RED y dashboard |
+| `nodered/` | Flujos de Node-RED y contrato con la interfaz web |
+| `web/` | Interfaz web: pantallas del terapeuta y del niño (la sirve Node-RED) |
 | `herramientas/` | Scripts: aprovisionamiento, sintetizador, arranque de Node-RED |
 | `docs/reporte/` | Reporte técnico |
 | `docs/pruebas/` | Matriz de pruebas de estrés y evidencias |
+| `docs/diseno/` | Diseño de la interfaz y auditoría de accesibilidad |
 
 ## Reglas
 

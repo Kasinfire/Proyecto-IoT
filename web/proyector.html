@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orquesta · pantalla del niño</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/proyector.css">
+</head>
+<body class="proyector">
+<main class="escenario" id="escenario" aria-label="La orquesta de animalitos">
+  <div class="juntos" id="juntos" hidden>
+    <span class="juntos__texto" id="juntos-texto">¡JUNTOS!</span>
+    <div class="juntos__lugares" id="juntos-lugares"></div>
+  </div>
+  <div class="simon" id="simon" role="status" hidden>
+    <span id="simon-cara"></span>
+    <span id="simon-texto"></span>
+  </div>
+  <div class="estrellas" id="estrellas" hidden>
+    <span id="estrella-icono"></span>
+    <span id="estrellas-cuenta" aria-label="estrellas">0</span>
+  </div>
+  <div class="avance-cancion" id="avance" role="img" aria-label="Avance de la canción" hidden></div>
+  <p class="aviso-ensayo-proyector" data-aviso-ensayo hidden>ENSAYO</p>
+</main>
+<script type="module" src="js/proyector.js"></script>
+</body>
+</html>

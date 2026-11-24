@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Niños · Orquesta</title>
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/componentes.css">
+<link rel="stylesheet" href="css/pantallas.css">
+</head>
+<body>
+<div class="pagina">
+
+<header class="encabezado">
+  <div class="marca"><div class="marca__logo" data-logo></div><p>Orquesta<span>Kids</span></p></div>
+  <nav class="menu" aria-label="Secciones">
+    <a href="en-vivo.html">En vivo</a>
+    <a href="historial.html">Historial</a>
+    <a href="canciones.html">Canciones</a>
+    <a href="ninos.html" aria-current="page">Niños</a>
+  </nav>
+  <div class="encabezado__acciones">
+    <a class="boton boton--sesion" href="en-vivo.html" data-enlace-sesion hidden>Sesión en curso ·<span data-alias></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+  </div>
+</header>
+
+
+<div class="titulo-con-filtros">
+  <h1 class="titulo-pagina">Niños</h1>
+  <button class="boton" type="button" id="agregar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Agregar niño</button>
+</div>
+
+<p class="vacio" id="error" hidden></p>
+<div class="ninos" id="ninos"></div>
+
+</div>
+<dialog class="ventana" id="ventana-agregar" aria-labelledby="t-agregar">
+  <form class="ventana__contenido" method="dialog" id="form-agregar">
+    <h2 class="ventana__titulo" id="t-agregar">Agregar niño</h2>
+    <div class="campo">
+      <label for="alias">Alias</label>
+      <input class="entrada" id="alias" name="alias" required maxlength="8" pattern="[A-Za-z]{1,2}-?[0-9]{1,3}" autocomplete="off" aria-describedby="alias-ayuda">
+      <p class="texto-ayuda" id="alias-ayuda">Una o dos letras y un número, como A-07. Nunca el nombre del niño.</p>
+    </div>
+    <p class="ventana__error" id="agregar-error" hidden></p>
+    <div class="ventana__acciones">
+      <button class="boton" type="submit" value="cancelar" formnovalidate>Cancelar</button>
+      <button class="boton boton--principal" type="submit" value="agregar">Agregar</button>
+    </div>
+  </form>
+</dialog>
+<script type="module" src="js/ninos.js"></script>
+</body>
+</html>
