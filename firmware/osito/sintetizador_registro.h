@@ -1,5 +1,5 @@
-// Sintetizador que no suena: imprime por Serial lo que tocaría. Sirve para probar los modos
-// sin haber elegido la ruta de audio. Sus líneas empiezan con [AUDIO-REGISTRO].
+// Ruta de audio por la laptop: imprime cada nota por Serial y un programa en la laptop la
+// toca. Sus líneas empiezan con [AUDIO-REGISTRO].
 #pragma once
 
 #include "sintetizador.h"

@@ -7,6 +7,7 @@
 
 #include <protocolo.h>
 
+#include <cstddef>
 #include <cstdint>
 
 #include "canciones.h"
@@ -26,7 +27,27 @@ bool elegirCancion(const char* nombre);
 const char* cancion();
 
 void alEvento(const interprete::Evento& evento, uint32_t ahora_ms);
-void avisoDesconexion();  // estado crítico: sonido de aviso por el sintetizador
+// Teclado DJ: devuelve true si el animal quedó silenciado. El osito no se puede silenciar.
+bool alternarSilencio(protocolo::Nodo nodo);
+bool silenciado(protocolo::Nodo nodo);
+// Looper (ver looper.h para el detalle). Suena en Libre y Simón.
+void grabarLoop();
+bool alternarLoop();  // true si quedó sonando
+void borrarLoop();
+// Tempo en % de la canción (100 = normal), entre TEMPO_MIN_PCT y TEMPO_MAX_PCT.
+uint8_t cambiarTempo(int paso_pct);
+uint8_t tempo();
+// Efectos del DJ (ver efectos_dj.h). Eco y octava son on/off; los demás suenan una vez.
+bool alternarEco();
+bool alternarOctava();
+void redoble(uint32_t ahora_ms);
+void subida(uint32_t ahora_ms);
+void pio();
+// true una sola vez cuando se cierra una grabación del looper.
+bool sacarFinGrabacion(size_t& notas_en_loop);
+void avisoDesconexion();
+// Desde orquesta/control/aviso: calla (o devuelve) el sonido de desconexión.
+void silenciarAviso(bool silenciar);  // estado crítico: sonido de aviso por el sintetizador
 void volumen(uint8_t valor);
 
 // Salidas para el resto del osito. Cada una devuelve true una sola vez.

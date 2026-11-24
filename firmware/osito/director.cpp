@@ -1,7 +1,9 @@
 #include "director.h"
 
 #include "config.h"
+#include "efectos_dj.h"
 #include "estado_animales.h"
+#include "looper.h"
 
 namespace director {
 namespace {
@@ -25,7 +27,8 @@ struct Parte {
   uint8_t expresion_enviada;
 };
 
-Sintetizador* sinte = nullptr;
+Sintetizador* sinte = nullptr;  // apunta a `efectos`, que pasa todo al sintetizador real
+EfectosDj efectos;
 Modo modo_actual = Modo::Cancion;
 const canciones::Cancion* cancion_actual = &canciones::LISTA[0];
 uint32_t ultimo_pulso_ms = 0;
@@ -38,8 +41,25 @@ Parte partes[protocolo::NUM_NODOS] = {};
 // Libre/Simón: lo que está sonando por gesto.
 uint8_t teclas_sonando[protocolo::NUM_NOTAS] = {};  // nota MIDI o SIN_NOTA
 uint8_t nota_ranita = SIN_NOTA;
-bool hay_golpe = false;
+constexpr size_t GOLPE_MAX_NOTAS = 3;
+uint8_t notas_golpe[GOLPE_MAX_NOTAS] = {};
+size_t num_notas_golpe = 0;
+// Teclado DJ: un animal silenciado no suena en ningún modo (el osito no se silencia).
+bool silenciados[protocolo::NUM_NODOS] = {};
+constexpr size_t SACUDIDAS_MAX = 8;
+uint32_t sacudidas_ms[SACUDIDAS_MAX] = {};
+size_t num_sacudidas = 0;
 uint32_t golpe_ms = 0;
+// Teclado DJ: tempo en % (100 = el de la canción) y las notas del loop que siguen sonando.
+uint8_t tempo_pct = 100;
+struct NotaLoop {
+  uint8_t canal;
+  uint8_t nota;
+};
+NotaLoop loop_sonando[config::LOOP_NOTAS_MAX + 1] = {};  // + el clic del metrónomo
+bool termino_grabacion = false;
+bool aviso_silenciado = false;  // Node-RED puede callar el sonido de desconexión
+size_t num_loop_sonando = 0;
 bool hay_respuesta = false;
 uint8_t nota_respuesta = 0;
 uint32_t respuesta_ms = 0;
@@ -53,7 +73,27 @@ uint8_t canal(Nodo nodo) {
   return config::CANAL_POR_NODO[protocolo::aEntero(nodo)];
 }
 
+// Duración del pulso con el tempo del DJ: más rápido = pulso más corto.
+uint32_t pulsoMs() {
+  return static_cast<uint32_t>(cancion_actual->pulso_ms) * 100 / tempo_pct;
+}
+
+// Nota tocada en vivo por un gesto: suena y, si el looper está grabando, se guarda.
+void tocarEnVivo(Nodo nodo, uint8_t nota, uint8_t velocidad, uint32_t ahora_ms) {
+  sinte->notaOn(canal(nodo), nota, velocidad);
+  const bool al_siguiente = (ahora_ms - ultimo_pulso_ms) * 2 >= pulsoMs();
+  looper::anotar(nodo, nota, velocidad, al_siguiente);
+}
+
+void soltarLoop() {
+  for (size_t i = 0; i < num_loop_sonando; ++i) {
+    sinte->notaOff(loop_sonando[i].canal, loop_sonando[i].nota);
+  }
+  num_loop_sonando = 0;
+}
+
 void apagarTodo() {
+  soltarLoop();
   for (size_t i = 0; i < protocolo::NUM_NODOS; ++i) {
     if (partes[i].sonando != SIN_NOTA) {
       sinte->notaOff(canal(static_cast<Nodo>(i)), partes[i].sonando);
@@ -71,7 +111,8 @@ void apagarTodo() {
     sinte->notaOff(canal(Nodo::Ranita), nota_ranita);
     nota_ranita = SIN_NOTA;
   }
-  hay_golpe = false;
+  num_notas_golpe = 0;
+  num_sacudidas = 0;
   hay_respuesta = false;
 }
 
@@ -86,7 +127,9 @@ void moverGanancias(uint32_t ahora_ms) {
   for (size_t i = 0; i < protocolo::NUM_NODOS; ++i) {
     const Nodo nodo = static_cast<Nodo>(i);
     // La base del osito siempre suena; las demás solo mientras su animal está activo.
-    const bool debe_sonar = nodo == Nodo::Osito || estado_animales::estaActivo(nodo, ahora_ms);
+    const bool debe_sonar =
+        nodo == Nodo::Osito ||
+        (estado_animales::estaActivo(nodo, ahora_ms) && !silenciados[protocolo::aEntero(nodo)]);
     Parte& parte = partes[i];
     const uint8_t objetivo = debe_sonar ? GANANCIA_MAX : 0;
     if (parte.ganancia < objetivo) {
@@ -110,7 +153,9 @@ void moverGanancias(uint32_t ahora_ms) {
   }
 }
 
-void tocarPulso() {
+void acentoCancion(uint32_t ahora_ms);
+
+void tocarPulso(uint32_t ahora_ms) {
   for (size_t i = 0; i < protocolo::NUM_NODOS; ++i) {
     const canciones::Parte& datos = cancion_actual->partes[i];
     Parte& parte = partes[i];
@@ -124,10 +169,15 @@ void tocarPulso() {
         parte.sonando = SIN_NOTA;
       }
       const canciones::Paso& paso = datos.pasos[parte.paso];
+      const bool empieza_vuelta = parte.paso == 0;
       parte.paso = (parte.paso + 1) % datos.num_pasos;
+      if (nodo == Nodo::Pollito && empieza_vuelta && parte.ganancia > 0) {
+        acentoCancion(ahora_ms);
+      }
       parte.pulsos_restantes = paso.pulsos;
       if (parte.ganancia > 0 && paso.nota_midi != canciones::SILENCIO) {
-        sinte->notaOn(canal(nodo), paso.nota_midi, config::VELOCIDAD_CANCION);
+        const uint8_t velocidad = paso.velocidad != 0 ? paso.velocidad : config::VELOCIDAD_CANCION;
+        sinte->notaOn(canal(nodo), paso.nota_midi, velocidad);
         parte.sonando = paso.nota_midi;
       }
     }
@@ -137,18 +187,94 @@ void tocarPulso() {
   }
 }
 
-void golpePollito(uint8_t intensidad, uint32_t ahora_ms) {
-  const uint8_t velocidad =
-      protocolo::VELOCIDAD_MIDI_MIN +
-      intensidad * (protocolo::VELOCIDAD_MIDI_MAX - protocolo::VELOCIDAD_MIDI_MIN) /
-          protocolo::INTENSIDAD_AGITAR_MAX;
-  sinte->notaOn(canal(Nodo::Pollito), config::NOTA_MARACA, velocidad);
-  hay_golpe = true;
+void soltarGolpe() {
+  for (size_t i = 0; i < num_notas_golpe; ++i) {
+    sinte->notaOff(canal(Nodo::Pollito), notas_golpe[i]);
+  }
+  num_notas_golpe = 0;
+}
+
+// Olvida las sacudidas que ya salieron de la ventana y dice cuántas quedan. Medido en el
+// osito: el sensor de bolita da casi siempre la misma intensidad, pero agitar más seguido sí.
+size_t sacudidasRecientes(uint32_t ahora_ms) {
+  size_t quedan = 0;
+  for (size_t i = 0; i < num_sacudidas; ++i) {
+    if (ahora_ms - sacudidas_ms[i] < config::VENTANA_SACUDIDAS_MS) {
+      sacudidas_ms[quedan++] = sacudidas_ms[i];
+    }
+  }
+  num_sacudidas = quedan;
+  return num_sacudidas;
+}
+
+// Anota una sacudida y dice cuántas van en la ventana, contando esta.
+size_t contarSacudida(uint32_t ahora_ms) {
+  if (sacudidasRecientes(ahora_ms) == SACUDIDAS_MAX) {  // lleno: se olvida la más vieja
+    for (size_t i = 1; i < num_sacudidas; ++i) {
+      sacudidas_ms[i - 1] = sacudidas_ms[i];
+    }
+    --num_sacudidas;
+  }
+  sacudidas_ms[num_sacudidas++] = ahora_ms;
+  return num_sacudidas;
+}
+
+uint8_t velocidadSacudidas(size_t seguidas) {
+  const uint32_t velocidad =
+      config::VELOCIDAD_SACUDIDA + config::VELOCIDAD_SACUDIDA_PASO * (seguidas - 1);
+  return velocidad > protocolo::VELOCIDAD_MIDI_MAX ? protocolo::VELOCIDAD_MIDI_MAX : velocidad;
+}
+
+// Suena las notas de notas_golpe; apagarNotasCortas las suelta tras GOLPE_MS.
+void sonarGolpe(uint8_t velocidad, uint32_t ahora_ms) {
+  for (size_t i = 0; i < num_notas_golpe; ++i) {
+    if (modo_actual == Modo::Cancion) {  // en Canción no se graba: el loop no suena ahí
+      sinte->notaOn(canal(Nodo::Pollito), notas_golpe[i], velocidad);
+    } else {
+      tocarEnVivo(Nodo::Pollito, notas_golpe[i], velocidad, ahora_ms);
+    }
+  }
   golpe_ms = ahora_ms;
+}
+
+// Platillo y pío según cuántas sacudidas seguidas van (los usan Libre, Simón y Canción).
+void agregarAcentos(size_t seguidas) {
+  if (seguidas >= config::SACUDIDAS_PLATILLO) {
+    notas_golpe[num_notas_golpe++] = config::NOTA_PLATILLO_ABIERTO;
+  }
+  if (seguidas >= config::SACUDIDAS_PIO) {
+    notas_golpe[num_notas_golpe++] = config::NOTA_PIO;
+  }
+}
+
+// Canción: al empezar cada vuelta del ritmo del pollito, si lo agitan seguido, se suman
+// platillo y pío encima del ritmo (a tiempo con la canción).
+void acentoCancion(uint32_t ahora_ms) {
+  const size_t seguidas = sacudidasRecientes(ahora_ms);
+  if (seguidas < config::SACUDIDAS_PLATILLO) {
+    return;
+  }
+  soltarGolpe();
+  agregarAcentos(seguidas);
+  sonarGolpe(velocidadSacudidas(seguidas), ahora_ms);
+}
+
+// Agitar poco = maraca; seguido = pandereta; más = con platillo; sin parar = además un "pío".
+// También sube el volumen, para que el niño oiga que la música crece al agitar.
+void golpePollito(uint32_t ahora_ms) {
+  soltarGolpe();
+  const size_t seguidas = contarSacudida(ahora_ms);
+  notas_golpe[num_notas_golpe++] =
+      seguidas < config::SACUDIDAS_PANDERETA ? config::NOTA_MARACA : config::NOTA_PANDERETA;
+  agregarAcentos(seguidas);
+  sonarGolpe(velocidadSacudidas(seguidas), ahora_ms);
 }
 
 // Libre (y Simón): cada gesto es una nota suelta.
 void tocarGesto(const interprete::Evento& evento, uint32_t ahora_ms) {
+  if (silenciados[protocolo::aEntero(evento.nodo)]) {
+    return;
+  }
   switch (evento.clase) {
     case interprete::Clase::Nota: {
       uint8_t& sonando = teclas_sonando[evento.valor];
@@ -158,7 +284,7 @@ void tocarGesto(const interprete::Evento& evento, uint32_t ahora_ms) {
       }
       if (evento.velocidad != protocolo::VELOCIDAD_SOLTO) {
         sonando = PENTATONICA_GATITO[evento.valor];
-        sinte->notaOn(canal(Nodo::Gatito), sonando, evento.velocidad);
+        tocarEnVivo(Nodo::Gatito, sonando, evento.velocidad, ahora_ms);
       }
       break;
     }
@@ -174,7 +300,7 @@ void tocarGesto(const interprete::Evento& evento, uint32_t ahora_ms) {
           sinte->notaOff(canal(Nodo::Ranita), nota_ranita);
         }
         if (nueva != SIN_NOTA) {
-          sinte->notaOn(canal(Nodo::Ranita), nueva, config::VELOCIDAD_RANITA);
+          tocarEnVivo(Nodo::Ranita, nueva, config::VELOCIDAD_RANITA, ahora_ms);
         }
         nota_ranita = nueva;
       }
@@ -182,7 +308,7 @@ void tocarGesto(const interprete::Evento& evento, uint32_t ahora_ms) {
     }
     case interprete::Clase::Agitar:
       if (evento.valor > 0) {
-        golpePollito(evento.valor, ahora_ms);
+        golpePollito(ahora_ms);
       }
       break;
     default:
@@ -201,13 +327,48 @@ void sonarRespuesta(uint8_t nota, uint32_t ahora_ms) {
 }
 
 void apagarNotasCortas(uint32_t ahora_ms) {
-  if (hay_golpe && ahora_ms - golpe_ms >= config::GOLPE_MS) {
-    sinte->notaOff(canal(Nodo::Pollito), config::NOTA_MARACA);
-    hay_golpe = false;
+  if (num_notas_golpe > 0 && ahora_ms - golpe_ms >= config::GOLPE_MS) {
+    soltarGolpe();
   }
   if (hay_respuesta && ahora_ms - respuesta_ms >= config::RESPUESTA_MS) {
     sinte->notaOff(canal(Nodo::Osito), nota_respuesta);
     hay_respuesta = false;
+  }
+}
+
+// Un pulso del reloj: la canción en Canción; el loop en Libre y Simón (en Canción manda la
+// canción y se encimarían). Mientras se graba suena un clic de metrónomo cada tiempo.
+void alPulso(uint32_t ahora_ms) {
+  soltarLoop();
+  efectos.alPulso();
+  if (modo_actual == Modo::Cancion) {
+    tocarPulso(ahora_ms);
+    hubo_pulso = true;
+  }
+  looper::Nota notas[config::LOOP_NOTAS_MAX];
+  bool termino = false;
+  const size_t cuantas = looper::alPulso(notas, config::LOOP_NOTAS_MAX, termino);
+  termino_grabacion = termino_grabacion || termino;
+  if (modo_actual == Modo::Cancion) {
+    return;
+  }
+  for (size_t i = 0; i < cuantas; ++i) {
+    if (silenciados[protocolo::aEntero(notas[i].nodo)]) {
+      continue;
+    }
+    const uint8_t c = canal(notas[i].nodo);
+    sinte->notaOn(c, notas[i].nota, notas[i].velocidad);
+    loop_sonando[num_loop_sonando++] = {c, notas[i].nota};
+  }
+  if (looper::grabando() && looper::paso() % config::PULSOS_POR_TIEMPO == 0) {
+    const uint8_t c = canal(Nodo::Pollito);
+    sinte->notaOn(c, config::NOTA_METRONOMO,
+                  looper::paso() == 0 ? config::VELOCIDAD_METRONOMO_FUERTE
+                                      : config::VELOCIDAD_METRONOMO);
+    loop_sonando[num_loop_sonando++] = {c, config::NOTA_METRONOMO};
+  }
+  if (cuantas > 0 || looper::grabando()) {
+    hubo_pulso = true;  // los LEDs marcan el tiempo mientras hay loop
   }
 }
 
@@ -230,8 +391,17 @@ void prepararModo(uint32_t ahora_ms) {
 }  // namespace
 
 void iniciar(Sintetizador& sintetizador, uint32_t semilla, uint32_t ahora_ms) {
-  sinte = &sintetizador;
+  efectos.conectar(sintetizador);
+  efectos.reiniciar();
+  sinte = &efectos;
   semilla_base = semilla;
+  for (bool& silenciado : silenciados) {
+    silenciado = false;
+  }
+  tempo_pct = 100;
+  num_loop_sonando = 0;
+  termino_grabacion = false;
+  looper::reiniciar();
   modo_actual = Modo::Cancion;
   cancion_actual = &canciones::LISTA[0];
   hay_luz = false;
@@ -253,14 +423,16 @@ void actualizar(uint32_t ahora_ms) {
   ultima_actualizacion_ms = ahora_ms;
   apagarNotasCortas(ahora_ms);
 
+  efectos.avanzar(ahora_ms);
+  // El reloj de pulsos corre en todos los modos: guía la canción y el looper.
+  if (ahora_ms - ultimo_pulso_ms >= pulsoMs()) {
+    ultimo_pulso_ms += pulsoMs();
+    alPulso(ahora_ms);
+  }
+
   switch (modo_actual) {
     case Modo::Cancion:
       moverGanancias(ahora_ms);
-      if (ahora_ms - ultimo_pulso_ms >= cancion_actual->pulso_ms) {
-        ultimo_pulso_ms += cancion_actual->pulso_ms;
-        tocarPulso();
-        hubo_pulso = true;
-      }
       break;
     case Modo::Libre:
       break;
@@ -317,7 +489,11 @@ const char* cancion() {
 void alEvento(const interprete::Evento& evento, uint32_t ahora_ms) {
   switch (modo_actual) {
     case Modo::Cancion:
-      // En Canción el gesto solo activa la parte (estado_animales); las notas son de la canción.
+      // En Canción el gesto activa la parte (estado_animales) y las notas son de la canción;
+      // del pollito solo se cuenta qué tan seguido lo agitan, para sus acentos.
+      if (evento.clase == interprete::Clase::Agitar && evento.valor > 0) {
+        contarSacudida(ahora_ms);
+      }
       break;
     case Modo::Libre:
       tocarGesto(evento, ahora_ms);
@@ -337,7 +513,102 @@ void alEvento(const interprete::Evento& evento, uint32_t ahora_ms) {
   }
 }
 
+bool alternarSilencio(Nodo nodo) {
+  if (nodo == Nodo::Osito) {
+    return false;
+  }
+  bool& silenciado = silenciados[protocolo::aEntero(nodo)];
+  silenciado = !silenciado;
+  if (!silenciado) {
+    return false;
+  }
+  // Lo que ya sonaba por gesto se calla de una vez; su parte de la canción sale con fade.
+  if (nodo == Nodo::Ranita && nota_ranita != SIN_NOTA) {
+    sinte->notaOff(canal(Nodo::Ranita), nota_ranita);
+    nota_ranita = SIN_NOTA;
+  } else if (nodo == Nodo::Gatito) {
+    for (uint8_t& nota : teclas_sonando) {
+      if (nota != SIN_NOTA) {
+        sinte->notaOff(canal(Nodo::Gatito), nota);
+        nota = SIN_NOTA;
+      }
+    }
+  } else if (nodo == Nodo::Pollito) {
+    soltarGolpe();
+  }
+  return true;
+}
+
+bool silenciado(Nodo nodo) {
+  return silenciados[protocolo::aEntero(nodo)];
+}
+
+void grabarLoop() {
+  looper::grabar();
+}
+
+bool alternarLoop() {
+  const bool sigue = looper::alternar();
+  if (!sigue) {
+    soltarLoop();
+  }
+  return sigue;
+}
+
+void borrarLoop() {
+  looper::borrar();
+  soltarLoop();
+}
+
+uint8_t cambiarTempo(int paso_pct) {
+  const int nuevo = static_cast<int>(tempo_pct) + paso_pct;
+  tempo_pct = nuevo < config::TEMPO_MIN_PCT   ? config::TEMPO_MIN_PCT
+              : nuevo > config::TEMPO_MAX_PCT ? config::TEMPO_MAX_PCT
+                                              : static_cast<uint8_t>(nuevo);
+  return tempo_pct;
+}
+
+uint8_t tempo() {
+  return tempo_pct;
+}
+
+bool alternarEco() {
+  return efectos.alternarEco();
+}
+
+bool alternarOctava() {
+  return efectos.alternarOctava();
+}
+
+void redoble(uint32_t ahora_ms) {
+  efectos.redoble(ahora_ms, pulsoMs());
+}
+
+void subida(uint32_t ahora_ms) {
+  efectos.subida(ahora_ms, pulsoMs());
+}
+
+void pio() {
+  efectos.pio();
+}
+
+bool sacarFinGrabacion(size_t& notas_en_loop) {
+  if (!termino_grabacion) {
+    return false;
+  }
+  termino_grabacion = false;
+  notas_en_loop = looper::numNotas();
+  return true;
+}
+
+void silenciarAviso(bool silenciar) {
+  aviso_silenciado = silenciar;
+}
+
 void avisoDesconexion() {
+  if (aviso_silenciado) {
+    return;  // el LED rojo de la pancita sigue avisando
+  }
   sonarRespuesta(config::NOTA_AVISO_DESCONEXION, ultima_actualizacion_ms);
 }
 

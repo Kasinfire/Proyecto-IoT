@@ -5,7 +5,7 @@
 #include "config.h"
 
 void SintetizadorRegistro::iniciar() {
-  Serial.println("[AUDIO-REGISTRO] Sin ruta de audio elegida: solo se imprimen las notas");
+  Serial.println("[AUDIO-REGISTRO] Audio por la laptop: las notas salen por este puerto serie");
 }
 
 void SintetizadorRegistro::notaOn(uint8_t canal, uint8_t nota_midi, uint8_t velocidad) {

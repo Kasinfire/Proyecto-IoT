@@ -36,8 +36,47 @@ constexpr uint32_t FADE_CADA_MS = 10;
 constexpr uint8_t EXPRESION_PASO = 8;
 constexpr uint8_t VELOCIDAD_CANCION = 90;
 constexpr uint8_t VELOCIDAD_RANITA = 80;
-constexpr uint8_t NOTA_MARACA = 70;  // General MIDI, canal 10
+// Pollito en Libre/Simón: cuántas sacudidas llegan en VENTANA_SACUDIDAS_MS escoge el
+// instrumento (notas General MIDI, canal 10). No se usa la intensidad: el sensor de bolita
+// da casi siempre 20 (medido 2026-11-23: 18 de 18 sacudidas). El pollito manda como mucho
+// una cada 350 ms, así que en 2 s caben ~6.
+constexpr uint8_t NOTA_MARACA = 70;
+constexpr uint8_t NOTA_PANDERETA = 54;
+constexpr uint8_t NOTA_PLATILLO_ABIERTO = 46;
+constexpr uint32_t VENTANA_SACUDIDAS_MS = 2000;
+constexpr size_t SACUDIDAS_PANDERETA = 2;  // desde aquí, pandereta
+constexpr size_t SACUDIDAS_PLATILLO = 4;   // desde aquí, pandereta + platillo de acento
+constexpr size_t SACUDIDAS_PIO = 5;        // desde aquí, además un "pío"
+constexpr uint8_t VELOCIDAD_SACUDIDA = 70;
+constexpr uint8_t VELOCIDAD_SACUDIDA_PASO = 12;  // más fuerte con cada sacudida seguida
+// Fuera de General MIDI (llega hasta 81): el sintetizador de la laptop lo toca como un pío.
+constexpr uint8_t NOTA_PIO = 90;
 constexpr uint32_t GOLPE_MS = 100;
+
+// Teclado DJ
+// Looper: 16 pulsos de 250 ms = 4 s (2 compases de 4 tiempos) con el tempo normal.
+constexpr uint8_t LOOP_PULSOS = 16;
+constexpr size_t LOOP_NOTAS_MAX = 64;
+constexpr uint8_t PULSOS_POR_TIEMPO = 2;  // el metrónomo suena cada 2 pulsos (cada 0.5 s)
+constexpr uint8_t NOTA_METRONOMO = 37;    // General MIDI, canal 10: golpe de aro
+constexpr uint8_t VELOCIDAD_METRONOMO = 35;
+constexpr uint8_t VELOCIDAD_METRONOMO_FUERTE = 70;  // al empezar la vuelta
+constexpr uint8_t TEMPO_MIN_PCT = 50;
+constexpr uint8_t TEMPO_MAX_PCT = 200;
+constexpr int TEMPO_PASO_PCT = 10;
+// Efectos del DJ. Sus sonidos van en canales propios para que el fade de Canción no los
+// apague: 15 melodía (piano en la laptop) y 16 percusión (como el 10).
+constexpr uint8_t CANAL_PERCUSION = 10;
+constexpr uint8_t CANAL_DJ_MELODIA = 15;
+constexpr uint8_t CANAL_DJ_PERCUSION = 16;
+constexpr uint8_t ECO_REPETICIONES = 3;
+constexpr uint8_t ECO_CADA_PULSOS = 2;  // cada 0.5 s con el tempo normal
+constexpr uint8_t ECO_QUEDA_PCT = 60;   // cada repetición suena al 60 % de la anterior
+constexpr uint8_t REDOBLE_PULSOS = 4;   // 1 s
+constexpr uint8_t SUBIDA_PULSOS = 8;    // 2 s
+constexpr uint8_t NOTA_TAMBOR = 38;     // General MIDI: tambor
+constexpr uint8_t NOTA_PLATILLO_CHOQUE = 49;
+constexpr uint8_t NOTA_CAIDA = 36;      // do grave del "drop"
 // Sonidos del osito: acierto, error y aviso de animal desconectado.
 constexpr uint8_t VELOCIDAD_AVISO = 100;
 constexpr uint8_t NOTA_ACIERTO = 84;
@@ -47,16 +86,26 @@ constexpr uint32_t RESPUESTA_MS = 300;
 // En el registro de audio: false si las notas tapan lo demás en el monitor serie.
 constexpr bool IMPRIMIR_AUDIO = true;
 
+
 // Simón Dice
 constexpr uint16_t SIMON_LUZ_MS = 1500;
 constexpr uint32_t SIMON_ESPERA_MS = 5000;
 constexpr uint32_t SIMON_PAUSA_MS = 1500;
 
 // MQTT
-// RAM: 64 x 128 B = 8 KB. Sin Wi-Fi, a ~2 eventos/s alcanza para ~30 s; lo demás se descarta
+constexpr uint16_t PUERTO_MQTTS = 8883;
+constexpr uint32_t REINTENTO_WIFI_MS = 10000;
+constexpr uint32_t REINTENTO_WIFI_MAX_MS = 120000;  // sin red, busca a lo más cada 2 min
+constexpr uint32_t REINTENTO_MQTT_MS = 5000;
+// Si el router no asocia en este tiempo, ESP-NOW arranca igual (la orquesta no depende del Wi-Fi).
+constexpr uint32_t ESPERA_WIFI_PARA_RADIO_MS = 15000;
+constexpr size_t BUFFER_MQTT_BYTES = 384;
+constexpr uint32_t VOLUMEN_CADA_MS = 500;      // el potenciómetro no inunda el broker
+constexpr uint32_t COLA_ESTADO_CADA_MS = 1000;
+// RAM: 64 x 160 B = 10 KB. Sin Wi-Fi, a ~2 eventos/s alcanza para ~30 s; lo demás se descarta
 // (el más viejo primero) hasta pasar la cola a LittleFS.
 constexpr size_t CAPACIDAD_COLA_MQTT = 64;
-constexpr size_t EVENTO_JSON_MAX = 128;
+constexpr size_t EVENTO_JSON_MAX = 160;  // el evento de modo con una canción larga ocupa 135
 constexpr size_t TOPICO_MAX = 40;
 constexpr size_t PUBLICAR_POR_VUELTA = 4;
 constexpr uint32_t REPUBLICAR_SIN_ACK_MS = 10000;

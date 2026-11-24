@@ -13,11 +13,18 @@
 #include <cstdint>
 
 #include "interprete.h"
+#include "simon.h"
 
 namespace contrato_mqtt {
 constexpr char TOPICO_MODO[] = "orquesta/control/modo";
 constexpr char TOPICO_MODO_ACK[] = "orquesta/control/modo/ack";
 constexpr char TOPICO_SYNC_ACK[] = "orquesta/sync/ack";
+// Node-RED -> osito: {"silenciar":true|false}. Calla el sonido de desconexión (el LED sigue).
+constexpr char TOPICO_AVISO[] = "orquesta/control/aviso";
+// Osito -> Node-RED, retenidos (estado, no historial): {"valor":0..127} y
+// {"pendientes":N,"descartados":D} del buffer de eventos.
+constexpr char TOPICO_VOLUMEN[] = "orquesta/osito/volumen";
+constexpr char TOPICO_COLA[] = "orquesta/osito/cola";
 constexpr size_t CANCION_MAX = 24;
 
 // orquesta/{nodo}/evento y orquesta/{nodo}/estado
@@ -30,12 +37,27 @@ bool armarEvento(uint32_t seq, uint32_t t, const interprete::Evento& evento, cha
                  size_t tamano);
 bool armarEstado(bool en_linea, char* destino, size_t tamano);
 
+// Eventos del propio osito (van por la cola con acuse a orquesta/osito/evento):
+// {"seq":..,"t":..,"nodo":"osito","tipo":"modo","modo":"libre","cancion":"prueba","origen":"teclado"}
+enum class Origen : uint8_t { Arranque, Boton, Teclado, NodeRed };
+bool armarEventoModo(uint32_t seq, uint32_t t, protocolo::Modo modo, const char* cancion,
+                     Origen origen, char* destino, size_t tamano);
+// Pedido: {"seq":..,"t":..,"nodo":"osito","tipo":"simon","pedido":"ranita"}
+// Resultado: igual + "resultado":"acierto|error|tiempo". Resultado::Nada = es el pedido.
+bool armarEventoSimon(uint32_t seq, uint32_t t, protocolo::Nodo pedido, simon::Resultado resultado,
+                      char* destino, size_t tamano);
+bool armarVolumen(uint8_t valor, char* destino, size_t tamano);
+bool armarCola(size_t pendientes, uint32_t descartados, char* destino, size_t tamano);
+// {"silenciar":true|false}; false si no lo trae.
+bool leerAviso(const char* json, bool& silenciar);
+
 struct PedidoModo {
   int32_t id;
   bool modo_valido;
   protocolo::Modo modo;
   bool trae_cancion;
   char cancion[CANCION_MAX];
+  bool simulado;  // llegó por "sim mqtt": su acuse no va al broker real
 };
 // {"id":<n>,"modo":"cancion|libre|simon","cancion":"estrellita"}. false si no trae "id":
 // sin id no hay a quién responder.

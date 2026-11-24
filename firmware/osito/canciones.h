@@ -18,6 +18,7 @@ constexpr uint8_t SILENCIO = 0;
 struct Paso {
   uint8_t nota_midi;  // SILENCIO = no suena en este paso
   uint8_t pulsos;     // duración, en pulsos
+  uint8_t velocidad = 0;  // qué tan fuerte (1..127); 0 = la de siempre (VELOCIDAD_CANCION)
 };
 
 struct Parte {
@@ -32,15 +33,16 @@ struct Cancion {
 };
 
 // "prueba" NO es una canción: cada parte repite una sola nota para oír que entra y sale
-// con su animal. Notas MIDI: 36 do grave, 64 mi, 67 sol, 42 platillo cerrado (canal 10).
-inline constexpr Paso PRUEBA_BASE[] = {{36, 2}};
-inline constexpr Paso PRUEBA_RANITA[] = {{64, 2}};
-inline constexpr Paso PRUEBA_GATITO[] = {{67, 1}};
-inline constexpr Paso PRUEBA_POLLITO[] = {{42, 1}};
+// con su animal. Notas MIDI: 36 do grave, 64 mi, 67 sol. El pollito (canal 10) ya lleva un
+// ritmo con acentos para probar el mecanismo: "CHK-chk-TOK-chk" (maraca 70, wood block 76).
+inline constexpr Paso PRUEBA_BASE[] = {{36, 4}};
+inline constexpr Paso PRUEBA_RANITA[] = {{64, 4}};
+inline constexpr Paso PRUEBA_GATITO[] = {{67, 2}};
+inline constexpr Paso PRUEBA_POLLITO[] = {{70, 1, 110}, {70, 1, 50}, {76, 1, 90}, {70, 1, 50}};
 
 inline constexpr Cancion LISTA[] = {
     {"prueba",
-     500,
+     250,  // pulso corto para que quepa el ritmo del pollito; la base sigue cada 1 s
      {
          {PRUEBA_BASE, std::size(PRUEBA_BASE)},        // Osito
          {PRUEBA_RANITA, std::size(PRUEBA_RANITA)},    // Ranita

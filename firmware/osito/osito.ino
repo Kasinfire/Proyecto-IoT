@@ -3,6 +3,7 @@
 #include <esp_random.h>
 #include <protocolo.h>
 
+#include "acciones_dj.h"
 #include "animales.h"
 #include "canciones.h"
 #include "config.h"
@@ -12,14 +13,21 @@
 #include "luces.h"
 #include "nube.h"
 #include "simulacion.h"
+#include "teclado_dj.h"
 #include "sintetizador_registro.h"
+#include "transporte_mqtt_real.h"
 #include "transporte_simulado.h"
 
 namespace {
-// La ruta de audio todavía no se elige: cambiar solo esta línea cuando se confirme.
+// El sonido sale por la laptop: el osito imprime cada nota por serie y la laptop la toca.
 SintetizadorRegistro sintetizador;
-// Falta la información para el broker real (ver transporte_mqtt.h): por ahora, simulado.
-TransporteSimulado broker;
+// La conexión real usa TLS validado por la CA del proyecto. El simulador queda aislado para
+// probar comandos; sus mensajes no se publican en el broker real.
+TransporteMqttReal broker;
+TransporteSimulado broker_simulado;
+bool inicio_radio_intentado = false;
+uint32_t arranque_ms = 0;
+protocolo::Nodo pedido_simon = protocolo::Nodo::Osito;  // a quién le tocó en Simón
 
 void anunciarModo() {
   const protocolo::Modo modo = director::modo();
@@ -27,6 +35,16 @@ void anunciarModo() {
   animales::avisarModo(modo);
   Serial.printf("[osito] modo=%s cancion=%s\n", protocolo::NOMBRE_MODO[protocolo::aEntero(modo)],
                 director::cancion());
+}
+
+// Cada cambio de modo queda en el historial, con quién lo pidió (también botón y teclado).
+void registrarModo(contrato_mqtt::Origen origen, bool simulado) {
+  nube::alModo(director::modo(), director::cancion(), origen, simulado);
+}
+
+// Lo que pasa en Simón con un animal que solo existe en la simulación no va al broker real.
+bool soloSimulado(protocolo::Nodo nodo, uint32_t ahora_ms) {
+  return !estado_animales::estaConectado(nodo, estado_animales::Fuente::Radio, ahora_ms);
 }
 
 // El tablero sabe si el osito aceptó el cambio con este acuse.
@@ -41,32 +59,126 @@ void atenderPedidosModo(uint32_t ahora_ms) {
       }
       director::cambiarModo(pedido.modo, ahora_ms);
       anunciarModo();
+      registrarModo(contrato_mqtt::Origen::NodeRed, pedido.simulado);
     } else {
       Serial.printf("[osito] Pedido de modo %ld rechazado (%s)\n", static_cast<long>(pedido.id),
                     pedido.modo_valido ? "esa canción no existe" : "modo desconocido");
     }
-    nube::responderModo(pedido.id, ok, director::modo());
+    nube::responderModo(pedido.id, ok, director::modo(), pedido.simulado);
   }
+}
+// Teclado DJ: A/B/C escogen el modo; 1/2/3 silencian o devuelven a ranita/gatito/pollito.
+void atenderTeclado(uint32_t ahora_ms) {
+  char tecla;
+  bool simulada = false;
+  while (teclado_dj::siguienteTecla(tecla, simulada)) {
+    const acciones_dj::Accion accion = acciones_dj::deTecla(tecla);
+    switch (accion.tipo) {
+      case acciones_dj::Tipo::CambiarModo:
+        Serial.printf("[dj] tecla %c\n", tecla);
+        director::cambiarModo(accion.modo, ahora_ms);
+        anunciarModo();
+        registrarModo(contrato_mqtt::Origen::Teclado, simulada);
+        break;
+      case acciones_dj::Tipo::AlternarSilencio: {
+        const bool callado = director::alternarSilencio(accion.nodo);
+        Serial.printf("[dj] tecla %c: %s %s\n", tecla,
+                      protocolo::NOMBRE_NODO[protocolo::aEntero(accion.nodo)],
+                      callado ? "silenciado" : "suena otra vez");
+        break;
+      }
+      case acciones_dj::Tipo::GrabarLoop:
+        if (director::modo() == protocolo::Modo::Cancion) {
+          Serial.println("[dj] tecla *: el loop se graba en Libre o Simón (B o C)");
+          break;
+        }
+        director::grabarLoop();
+        Serial.println("[dj] tecla *: grabando loop (2 compases, suena el metrónomo)");
+        break;
+      case acciones_dj::Tipo::AlternarLoop:
+        Serial.printf("[dj] tecla #: loop %s\n", director::alternarLoop() ? "sonando" : "parado");
+        break;
+      case acciones_dj::Tipo::BorrarLoop:
+        director::borrarLoop();
+        Serial.println("[dj] tecla D: loop borrado");
+        break;
+      case acciones_dj::Tipo::CambiarTempo:
+        Serial.printf("[dj] tecla %c: tempo %u%%\n", tecla,
+                      director::cambiarTempo(accion.tempo_pct));
+        break;
+      case acciones_dj::Tipo::Eco:
+        Serial.printf("[dj] tecla 4: eco %s\n", director::alternarEco() ? "encendido" : "apagado");
+        break;
+      case acciones_dj::Tipo::Redoble:
+        director::redoble(ahora_ms);
+        Serial.println("[dj] tecla 5: redoble");
+        break;
+      case acciones_dj::Tipo::Subida:
+        director::subida(ahora_ms);
+        Serial.println("[dj] tecla 6: subida y caída");
+        break;
+      case acciones_dj::Tipo::Octava:
+        Serial.printf("[dj] tecla 8: octava %s\n",
+                      director::alternarOctava() ? "arriba" : "normal");
+        break;
+      case acciones_dj::Tipo::Pio:
+        director::pio();
+        Serial.println("[dj] tecla 0: pío-pío");
+        break;
+      default:
+        Serial.printf("[dj] tecla %c (sin uso)\n", tecla);
+        break;
+    }
+  }
+}
+// ESP-NOW usa el canal del router, así que se arranca al asociarse al Wi-Fi. Plan B: sin
+// credenciales de Wi-Fi o si el router no responde a tiempo, arranca en el canal por defecto
+// para que la orquesta funcione igual (sin MQTT). Los animales oyen el modo hasta que la
+// radio existe, por eso se anuncia otra vez.
+void iniciarRadioCuandoToque() {
+  if (inicio_radio_intentado) {
+    return;
+  }
+  const char* motivo = nullptr;
+  if (broker.wifiConectado()) {
+    motivo = "Wi-Fi conectado: canal del router";
+  } else if (!broker.tieneCredenciales()) {
+    motivo = "sin datos de Wi-Fi en NVS: canal por defecto, sin MQTT";
+  } else if (millis() - arranque_ms >= config::ESPERA_WIFI_PARA_RADIO_MS) {
+    motivo = "el Wi-Fi no respondió a tiempo: canal actual; si conecta después, la radio pasa "
+             "al canal del router";
+  } else {
+    return;
+  }
+  inicio_radio_intentado = true;
+  Serial.printf("[osito] Iniciando ESP-NOW (%s)\n", motivo);
+  animales::iniciar();
+  anunciarModo();
 }
 }  // namespace
 
 void setup() {
   Serial.begin(config::BAUDIOS);
   Serial.println("[osito] Arrancando");
+  arranque_ms = millis();
   entradas::iniciar();
+  teclado_dj::iniciar();
   luces::iniciar();
   sintetizador.iniciar();
-  animales::iniciar();
   director::iniciar(sintetizador, esp_random(), millis());
   director::volumen(entradas::volumen());
-  nube::iniciar(broker);
-  simulacion::iniciar(broker);
+  nube::iniciar(broker);  // inicia Wi-Fi; ESP-NOW se arranca después de asociarse al router
+  broker_simulado.iniciar(nube::inyectarSimulado);
+  simulacion::iniciar(broker_simulado);
   anunciarModo();
+  registrarModo(contrato_mqtt::Origen::Arranque, false);
 }
 
 void loop() {
   simulacion::actualizar();
   entradas::actualizar();
+  teclado_dj::actualizar();
+  iniciarRadioCuandoToque();
   animales::actualizar();
 
   const uint32_t ahora_ms = millis();
@@ -83,13 +195,28 @@ void loop() {
     }
   }
 
-  if (entradas::sePresionoModo()) {
+  bool presion_simulada = false;
+  if (entradas::sePresionoModo(presion_simulada)) {
     director::siguienteModo(ahora_ms);
     anunciarModo();
+    registrarModo(contrato_mqtt::Origen::Boton, presion_simulada);
+  }
+  bool silenciar = false;
+  if (nube::sacarAviso(silenciar)) {
+    director::silenciarAviso(silenciar);
+    Serial.printf("[osito] Sonido de aviso %s desde Node-RED (el LED sigue)\n",
+                  silenciar ? "silenciado" : "activado");
+  }
+  atenderTeclado(ahora_ms);
+  size_t notas_en_loop = 0;
+  if (director::sacarFinGrabacion(notas_en_loop)) {
+    Serial.printf("[dj] loop listo: %u notas, ya se repite solo\n",
+                  static_cast<unsigned>(notas_en_loop));
   }
   atenderPedidosModo(ahora_ms);
   if (entradas::huboCambioVolumen()) {
     director::volumen(entradas::volumen());
+    nube::alVolumen(entradas::volumen());
   }
 
   director::actualizar(ahora_ms);
@@ -101,12 +228,15 @@ void loop() {
   protocolo::PayloadLuz luz;
   if (director::sacarLuz(luz)) {
     animales::pedirLuz(luz);
+    pedido_simon = static_cast<protocolo::Nodo>(luz.nodo_destino);
+    nube::alSimon(pedido_simon, simon::Resultado::Nada, soloSimulado(pedido_simon, ahora_ms));
   }
   simon::Resultado resultado;
   if (director::sacarResultado(resultado)) {
     Serial.printf("[simon] %s (aciertos=%u errores=%u)\n",
                   simon::NOMBRE_RESULTADO[protocolo::aEntero(resultado)], simon::aciertos(),
                   simon::errores());
+    nube::alSimon(pedido_simon, resultado, soloSimulado(pedido_simon, ahora_ms));
   }
 
   nube::actualizar();

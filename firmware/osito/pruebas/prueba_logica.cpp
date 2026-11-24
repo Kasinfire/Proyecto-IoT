@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstring>
 
+#include "acciones_dj.h"
 #include "cola_eventos.h"
 #include "config.h"
 #include "contrato_mqtt.h"
@@ -203,12 +204,23 @@ void pruebasAntirrebote() {
 class SintetizadorFalso : public Sintetizador {
  public:
   void iniciar() override {}
-  void notaOn(uint8_t canal, uint8_t nota, uint8_t) override {
+  void notaOn(uint8_t canal, uint8_t nota, uint8_t velocidad) override {
     ++on[canal];
     ultima_on[canal] = nota;
+    ultima_vel[canal] = velocidad;
+    if (canal == 10 && nota == 76) {
+      ++wood_block;
+    }
+    if (canal == 10 && velocidad == 110) {
+      ++acentos;
+    }
+    if (canal == 10 && nota == 90) {
+      ++pios;
+    }
   }
-  void notaOff(uint8_t canal, uint8_t) override {
+  void notaOff(uint8_t canal, uint8_t nota) override {
     ++off[canal];
+    ultima_off[canal] = nota;
   }
   void expresion(uint8_t canal, uint8_t valor) override {
     exp[canal] = valor;
@@ -220,6 +232,11 @@ class SintetizadorFalso : public Sintetizador {
     }
   }
   int on[17] = {};
+  uint8_t ultima_vel[17] = {};
+  int wood_block = 0;
+  int acentos = 0;
+  int pios = 0;
+  int ultima_off[17] = {};
   int off[17] = {};
   uint8_t ultima_on[17] = {};
   uint8_t exp[17] = {};
@@ -271,6 +288,31 @@ void pruebasCancion() {
   revisar("cancion: ya sin gesto no vuelve a sonar", s.on[C_RANITA] == antes);
   revisar("cancion: la base sigue sonando", s.exp[C_OSITO] == 127);
 
+  // SIMULACIÓN: el pollito agitado en Canción toca su ritmo con acentos.
+  s.limpiar();
+  s.wood_block = 0;
+  s.acentos = 0;
+  const int pollito = protocolo::aEntero(Nodo::Pollito);
+  estado_animales::registrarMensaje(Nodo::Pollito, Fuente::Simulacion, t);
+  estado_animales::registrarGesto(Nodo::Pollito, t);
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 60), t);
+  const uint32_t agito_ms = t;
+  correr(t, agito_ms + 1500, pollito);
+  revisar("cancion: el ritmo del pollito trae wood block (76)", s.wood_block >= 1);
+  revisar("cancion: y golpes acentuados (velocidad 110)", s.acentos >= 1);
+  revisar("cancion: la base sigue a 1 por segundo con pulso de 250 ms",
+          s.on[C_OSITO] >= 1 && s.on[C_OSITO] <= 2);
+  revisar("cancion: con una sola sacudida no hay pio", s.pios == 0);
+
+  // SIMULACIÓN: agitarlo seguido (cada 350 ms, lo más rápido que manda el pollito).
+  for (int i = 0; i < 6; ++i) {
+    estado_animales::registrarGesto(Nodo::Pollito, t);
+    director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+    correr(t, t + 350, pollito);
+  }
+  correr(t, t + 1000, pollito);
+  revisar("cancion: agitado seguido, el pollito suma el pio al ritmo", s.pios >= 1);
+
   revisar("cancion: \"estrellita\" no existe todavia", !director::elegirCancion("estrellita"));
   revisar("cancion: \"prueba\" si existe", director::elegirCancion("prueba"));
 }
@@ -298,11 +340,37 @@ void pruebasLibre() {
   director::alEvento(gesto(Nodo::Ranita, Clase::Sombra, 0), t);
   revisar("libre: ranita destapada -> se apaga", s.off[C_RANITA] == 1);
 
-  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 70), t);
-  revisar("libre: pollito agitado -> golpe en canal 10",
+  // El instrumento depende de cuántas sacudidas seguidas llegan (cada 400 ms aquí).
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+  revisar("libre: 1 sacudida -> maraca (70) en canal 10",
           s.on[C_POLLITO] == 1 && s.ultima_on[C_POLLITO] == 70);
+  const uint8_t vel_una = s.ultima_vel[C_POLLITO];
   correr(t, t + 150);
   revisar("libre: el golpe se apaga solo", s.off[C_POLLITO] == 1);
+  correr(t, t + 250);
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+  revisar("libre: 2 seguidas -> pandereta (54)",
+          s.on[C_POLLITO] == 2 && s.ultima_on[C_POLLITO] == 54);
+  correr(t, t + 400);
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+  correr(t, t + 400);
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+  revisar("libre: 4 seguidas -> pandereta + platillo abierto (46)",
+          s.on[C_POLLITO] == 5 && s.ultima_on[C_POLLITO] == 46);
+  correr(t, t + 150);
+  revisar("libre: se sueltan las dos notas", s.off[C_POLLITO] == 5);
+  correr(t, t + 250);
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+  revisar("libre: 5 seguidas -> ademas un pio (90)",
+          s.on[C_POLLITO] == 8 && s.ultima_on[C_POLLITO] == 90);
+  revisar("libre: agitar seguido suena mas fuerte", s.ultima_vel[C_POLLITO] > vel_una);
+  correr(t, t + 150);
+  revisar("libre: se sueltan las tres notas", s.off[C_POLLITO] == 8);
+  correr(t, t + 2100);
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+  revisar("libre: tras 2 s quieto vuelve a la maraca",
+          s.on[C_POLLITO] == 9 && s.ultima_on[C_POLLITO] == 70);
+  correr(t, t + 150);
 
   const uint8_t pentatonica[] = {60, 62, 64, 67, 69, 72, 74, 76, 79, 81, 84, 86, 88};
   bool todas_en_escala = true;
@@ -379,6 +447,216 @@ void pruebasModos() {
   revisar("boton: cancion -> libre -> simon -> cancion",
           libre && simon && director::modo() == protocolo::Modo::Cancion);
 }
+void pruebasDj() {
+  using acciones_dj::Tipo;
+  using interprete::Clase;
+  revisar("dj: A -> cancion", acciones_dj::deTecla('A').tipo == Tipo::CambiarModo &&
+                                  acciones_dj::deTecla('A').modo == protocolo::Modo::Cancion);
+  revisar("dj: B -> libre", acciones_dj::deTecla('B').modo == protocolo::Modo::Libre);
+  revisar("dj: C -> simon", acciones_dj::deTecla('C').modo == protocolo::Modo::Simon);
+  revisar("dj: 1/2/3 -> ranita/gatito/pollito",
+          acciones_dj::deTecla('1').nodo == Nodo::Ranita &&
+              acciones_dj::deTecla('2').nodo == Nodo::Gatito &&
+              acciones_dj::deTecla('3').tipo == Tipo::AlternarSilencio &&
+              acciones_dj::deTecla('3').nodo == Nodo::Pollito);
+  revisar("dj: * graba, # play/stop, D borra",
+          acciones_dj::deTecla('*').tipo == Tipo::GrabarLoop &&
+              acciones_dj::deTecla('#').tipo == Tipo::AlternarLoop &&
+              acciones_dj::deTecla('D').tipo == Tipo::BorrarLoop);
+  revisar("dj: 7 baja y 9 sube el tempo", acciones_dj::deTecla('7').tempo_pct < 0 &&
+                                              acciones_dj::deTecla('9').tempo_pct > 0);
+  revisar("dj: 4 eco, 5 redoble, 6 subida, 8 octava, 0 pio",
+          acciones_dj::deTecla('4').tipo == Tipo::Eco &&
+              acciones_dj::deTecla('5').tipo == Tipo::Redoble &&
+              acciones_dj::deTecla('6').tipo == Tipo::Subida &&
+              acciones_dj::deTecla('8').tipo == Tipo::Octava &&
+              acciones_dj::deTecla('0').tipo == Tipo::Pio);
+
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t);
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  revisar("dj: el osito no se silencia", !director::alternarSilencio(Nodo::Osito));
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 90), t);
+  revisar("dj: gatito suena antes de silenciar", s.on[C_GATITO] == 1);
+  revisar("dj: tecla 2 silencia al gatito", director::alternarSilencio(Nodo::Gatito));
+  revisar("dj: al silenciar se apaga lo que sonaba", s.off[C_GATITO] == 1);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 4, 90), t);
+  revisar("dj: gatito silenciado no toca", s.on[C_GATITO] == 1);
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+  revisar("dj: los demas siguen sonando", s.on[C_POLLITO] == 1);
+  revisar("dj: tecla 2 otra vez lo devuelve", !director::alternarSilencio(Nodo::Gatito));
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 4, 90), t);
+  revisar("dj: gatito vuelve a tocar", s.on[C_GATITO] == 2);
+
+  // SIMULACIÓN: en Canción, la ranita activa pero silenciada sale con fade.
+  director::cambiarModo(protocolo::Modo::Cancion, t);
+  const int vivo = protocolo::aEntero(Nodo::Ranita);
+  estado_animales::registrarMensaje(Nodo::Ranita, Fuente::Simulacion, t);
+  estado_animales::registrarGesto(Nodo::Ranita, t);
+  correr(t, t + 500, vivo);
+  revisar("dj: cancion, ranita activa suena", s.exp[C_RANITA] == 127);
+  director::alternarSilencio(Nodo::Ranita);
+  estado_animales::registrarGesto(Nodo::Ranita, t);
+  correr(t, t + 400, vivo);
+  revisar("dj: cancion, ranita silenciada baja a 0 aunque siga activa", s.exp[C_RANITA] == 0);
+  revisar("dj: cancion, la base sigue", s.exp[C_OSITO] == 127);
+}
+
+void pruebasLooper() {
+  using interprete::Clase;
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t);
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  s.limpiar();
+  const uint32_t pulso = 250;  // "prueba" con tempo normal
+
+  director::grabarLoop();
+  correr(t, t + 10);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 90), t);  // mi, antes del 1er pulso
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 0), t);
+  correr(t, t + pulso * 4 + 20);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 4, 90), t);  // sol, a tiempo
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 4, 0), t);
+  revisar("looper: mientras graba suena el metronomo", s.on[C_POLLITO] >= 2);
+  size_t notas = 0;
+  revisar("looper: aun no termina de grabar", !director::sacarFinGrabacion(notas));
+  correr(t, t + pulso * 13);
+  revisar("looper: a los 16 pulsos termina", director::sacarFinGrabacion(notas) && notas == 2);
+  s.limpiar();
+  correr(t, t + pulso * 16);
+  revisar("looper: una vuelta repite las 2 notas solo", s.on[C_GATITO] == 2);
+  revisar("looper: y ya sin metronomo", s.on[C_POLLITO] == 0);
+  revisar("looper: cada nota del loop se suelta", s.off[C_GATITO] == 2);
+
+  // Encimar: el pollito agitado en otra vuelta se suma al loop.
+  director::grabarLoop();
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+  correr(t, t + pulso * 16 + 10);
+  s.limpiar();
+  correr(t, t + pulso * 16);
+  revisar("looper: encimar suma la capa del pollito",
+          s.on[C_GATITO] == 2 && s.on[C_POLLITO] == 1);
+
+  director::alternarSilencio(Nodo::Gatito);
+  s.limpiar();
+  correr(t, t + pulso * 16);
+  revisar("looper: silenciar al gatito calla su parte del loop",
+          s.on[C_GATITO] == 0 && s.on[C_POLLITO] == 1);
+  director::alternarSilencio(Nodo::Gatito);
+
+  revisar("looper: # lo para", !director::alternarLoop());
+  s.limpiar();
+  correr(t, t + pulso * 16);
+  revisar("looper: parado no suena", s.on[C_GATITO] == 0);
+  revisar("looper: # lo vuelve a poner", director::alternarLoop());
+  director::cambiarModo(protocolo::Modo::Cancion, t);
+  s.limpiar();
+  correr(t, t + pulso * 16);
+  revisar("looper: en Cancion no suena el loop", s.on[C_GATITO] == 0);
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  correr(t, t + pulso * 16);
+  revisar("looper: de vuelta en Libre sigue ahi", s.on[C_GATITO] == 2);
+  director::borrarLoop();
+  s.limpiar();
+  correr(t, t + pulso * 16);
+  revisar("looper: D lo borra", s.on[C_GATITO] == 0 && !director::alternarLoop());
+}
+
+void pruebasLooperCancelar() {
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t);
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  director::grabarLoop();
+  correr(t, t + 600);
+  director::alternarLoop();  // # con la grabación nueva todavía vacía
+  s.limpiar();
+  correr(t, t + 1000);
+  revisar("looper: # cancela una grabacion vacia (sin metronomo)", s.on[C_POLLITO] == 0);
+}
+
+void pruebasEfectos() {
+  using interprete::Clase;
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t);
+  director::cambiarModo(protocolo::Modo::Libre, t);
+  s.limpiar();
+  const uint32_t pulso = 250;
+
+  revisar("efectos: octava arriba", director::alternarOctava());
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 90), t);  // mi = 64
+  revisar("efectos: con octava el mi suena 76", s.ultima_on[C_GATITO] == 76);
+  director::alternarOctava();
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 2, 0), t);
+  revisar("efectos: se suelta el 76 aunque ya se quito la octava",
+          s.ultima_off[C_GATITO] == 76);
+  director::alEvento(gesto(Nodo::Pollito, Clase::Agitar, 20), t);
+  revisar("efectos: la percusion no cambia de octava", s.ultima_on[C_POLLITO] == 70);
+
+  s.limpiar();
+  revisar("efectos: eco encendido", director::alternarEco());
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 0, 100), t);
+  director::alEvento(gesto(Nodo::Gatito, Clase::Nota, 0, 0), t);
+  correr(t, t + pulso * 8);
+  revisar("efectos: eco repite la nota 3 veces", s.on[C_GATITO] == 4);
+  revisar("efectos: cada eco mas bajito", s.ultima_vel[C_GATITO] < 100 * 60 / 100);
+  revisar("efectos: eco apagado", !director::alternarEco());
+
+  s.limpiar();
+  director::redoble(t);
+  correr(t, t + pulso * 4 + 20);
+  revisar("efectos: redoble toca varios golpes de tambor", s.on[16] >= 8);
+  revisar("efectos: y remata con platillo", s.ultima_on[16] == 49);
+
+  s.limpiar();
+  director::subida(t);
+  correr(t, t + pulso * 4);
+  const uint8_t a_la_mitad = s.ultima_on[15];
+  correr(t, t + pulso * 4 + 20);
+  revisar("efectos: la subida va subiendo", a_la_mitad > 60 && a_la_mitad < 96);
+  revisar("efectos: termina con la caida (do grave)", s.ultima_on[15] == 36);
+  revisar("efectos: y platillo", s.ultima_on[16] == 49);
+
+  s.limpiar();
+  director::pio();
+  revisar("efectos: 0 toca el pio en el canal del DJ", s.ultima_on[16] == 90);
+
+  // En Canción los efectos también suenan: van en canales que el fade no toca.
+  director::cambiarModo(protocolo::Modo::Cancion, t);
+  s.limpiar();
+  director::redoble(t);
+  correr(t, t + pulso * 4 + 20);
+  revisar("efectos: el redoble suena tambien en Cancion", s.on[16] >= 8);
+}
+
+void pruebasTempo() {
+  estado_animales::reiniciar();
+  SintetizadorFalso s;
+  uint32_t t = 1000;
+  director::iniciar(s, 7, t);
+  correr(t, t + 4000);
+  const int normal = s.on[C_OSITO];
+  revisar("tempo: empieza en 100%", director::tempo() == 100);
+  for (int i = 0; i < 20; ++i) {
+    director::cambiarTempo(10);
+  }
+  revisar("tempo: no pasa de 200%", director::tempo() == 200);
+  s.limpiar();
+  correr(t, t + 4000);
+  revisar("tempo: al 200% la base suena el doble", s.on[C_OSITO] >= normal * 2 - 1);
+  for (int i = 0; i < 30; ++i) {
+    director::cambiarTempo(-10);
+  }
+  revisar("tempo: no baja de 50%", director::tempo() == 50);
+}
+
 void pruebasContratoMqtt() {
   using interprete::Clase;
   char texto[128];
@@ -417,6 +695,31 @@ void pruebasContratoMqtt() {
           contrato_mqtt::leerSyncAck("{\"hasta_seq\":42}", hasta) && hasta == 42);
   revisar("mqtt: sync ack negativo -> invalido",
           !contrato_mqtt::leerSyncAck("{\"hasta_seq\":-1}", hasta));
+  // Mensajes nuevos para la interfaz web (nodered/README.md del PR #13).
+  char buf[config::EVENTO_JSON_MAX];
+  revisar("mqtt: evento de modo del osito con origen",
+          contrato_mqtt::armarEventoModo(9, 0, protocolo::Modo::Libre, "prueba",
+                                         contrato_mqtt::Origen::Teclado, buf, sizeof(buf)) &&
+              strcmp(buf, "{\"seq\":9,\"t\":0,\"nodo\":\"osito\",\"tipo\":\"modo\","
+                          "\"modo\":\"libre\",\"cancion\":\"prueba\",\"origen\":\"teclado\"}") == 0);
+  revisar("mqtt: simon pedido",
+          contrato_mqtt::armarEventoSimon(10, 0, Nodo::Ranita, simon::Resultado::Nada, buf,
+                                          sizeof(buf)) &&
+              strstr(buf, "\"pedido\":\"ranita\"}") != nullptr);
+  revisar("mqtt: simon tiempo agotado se llama \"tiempo\"",
+          contrato_mqtt::armarEventoSimon(11, 0, Nodo::Pollito, simon::Resultado::TiempoAgotado,
+                                          buf, sizeof(buf)) &&
+              strstr(buf, "\"pedido\":\"pollito\",\"resultado\":\"tiempo\"}") != nullptr);
+  revisar("mqtt: volumen", contrato_mqtt::armarVolumen(70, buf, sizeof(buf)) &&
+                               strcmp(buf, "{\"valor\":70}") == 0);
+  revisar("mqtt: estado de la cola", contrato_mqtt::armarCola(37, 2, buf, sizeof(buf)) &&
+                                         strcmp(buf, "{\"pendientes\":37,\"descartados\":2}") == 0);
+  bool silenciar = false;
+  revisar("mqtt: aviso silenciar true",
+          contrato_mqtt::leerAviso("{\"silenciar\": true}", silenciar) && silenciar);
+  revisar("mqtt: aviso silenciar false",
+          contrato_mqtt::leerAviso("{\"silenciar\":false}", silenciar) && !silenciar);
+  revisar("mqtt: aviso sin el campo se ignora", !contrato_mqtt::leerAviso("{}", silenciar));
 }
 
 void pruebasColaEventos() {
@@ -471,6 +774,11 @@ int main() {
   pruebasLibre();
   pruebasSimon();
   pruebasModos();
+  pruebasDj();
+  pruebasLooper();
+  pruebasLooperCancelar();
+  pruebasTempo();
+  pruebasEfectos();
   pruebasContratoMqtt();
   pruebasColaEventos();
   printf("[SIMULACIÓN] %d de %d pruebas pasaron\n", pruebas - fallos, pruebas);

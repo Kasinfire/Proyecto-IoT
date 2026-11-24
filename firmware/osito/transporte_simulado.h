@@ -8,7 +8,7 @@ class TransporteSimulado : public TransporteMqtt {
  public:
   void iniciar(AlMensaje al_mensaje) override;
   void actualizar() override {}
-  bool conectado() const override {
+  bool conectado() override {
     return conectado_;
   }
   bool publicar(const char* topico, const char* payload, bool retenido) override;

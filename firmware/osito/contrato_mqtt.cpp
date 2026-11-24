@@ -53,6 +53,22 @@ bool leerEntero(const char* json, const char* clave, long long& valor) {
   return fin != p;
 }
 
+bool leerBooleano(const char* json, const char* clave, bool& valor) {
+  const char* p = valorDe(json, clave);
+  if (p == nullptr) {
+    return false;
+  }
+  if (strncmp(p, "true", 4) == 0) {
+    valor = true;
+    return true;
+  }
+  if (strncmp(p, "false", 5) == 0) {
+    valor = false;
+    return true;
+  }
+  return false;
+}
+
 bool leerTexto(const char* json, const char* clave, char* destino, size_t tamano) {
   const char* p = valorDe(json, clave);
   if (p == nullptr || *p != '"') {
@@ -114,6 +130,62 @@ bool armarEvento(uint32_t seq, uint32_t t, const interprete::Evento& evento, cha
 bool armarEstado(bool en_linea, char* destino, size_t tamano) {
   return cupo(snprintf(destino, tamano, "{\"estado\":\"%s\"}", en_linea ? "online" : "offline"),
               tamano);
+}
+
+bool armarEventoModo(uint32_t seq, uint32_t t, protocolo::Modo modo, const char* cancion,
+                     Origen origen, char* destino, size_t tamano) {
+  static constexpr const char* ORIGENES[] = {"arranque", "boton", "teclado", "nodered"};
+  const uint8_t m = protocolo::aEntero(modo);
+  const uint8_t o = static_cast<uint8_t>(origen);
+  if (m >= protocolo::NUM_MODOS || o >= sizeof(ORIGENES) / sizeof(ORIGENES[0]) ||
+      cancion == nullptr) {
+    return false;
+  }
+  return cupo(snprintf(destino, tamano,
+                       "{\"seq\":%lu,\"t\":%lu,\"nodo\":\"osito\",\"tipo\":\"modo\","
+                       "\"modo\":\"%s\",\"cancion\":\"%s\",\"origen\":\"%s\"}",
+                       static_cast<unsigned long>(seq), static_cast<unsigned long>(t),
+                       protocolo::NOMBRE_MODO[m], cancion, ORIGENES[o]),
+              tamano);
+}
+
+bool armarEventoSimon(uint32_t seq, uint32_t t, Nodo pedido, simon::Resultado resultado,
+                      char* destino, size_t tamano) {
+  // Los nombres que espera la interfaz web (nodered/README.md).
+  static constexpr const char* RESULTADOS[] = {"", "acierto", "error", "tiempo"};
+  const uint8_t n = protocolo::aEntero(pedido);
+  const uint8_t r = static_cast<uint8_t>(resultado);
+  if (n >= protocolo::NUM_NODOS || r >= sizeof(RESULTADOS) / sizeof(RESULTADOS[0])) {
+    return false;
+  }
+  const unsigned long s = seq;
+  const unsigned long tt = t;
+  if (resultado == simon::Resultado::Nada) {
+    return cupo(snprintf(destino, tamano,
+                         "{\"seq\":%lu,\"t\":%lu,\"nodo\":\"osito\",\"tipo\":\"simon\","
+                         "\"pedido\":\"%s\"}",
+                         s, tt, protocolo::NOMBRE_NODO[n]),
+                tamano);
+  }
+  return cupo(snprintf(destino, tamano,
+                       "{\"seq\":%lu,\"t\":%lu,\"nodo\":\"osito\",\"tipo\":\"simon\","
+                       "\"pedido\":\"%s\",\"resultado\":\"%s\"}",
+                       s, tt, protocolo::NOMBRE_NODO[n], RESULTADOS[r]),
+              tamano);
+}
+
+bool armarVolumen(uint8_t valor, char* destino, size_t tamano) {
+  return cupo(snprintf(destino, tamano, "{\"valor\":%u}", valor), tamano);
+}
+
+bool armarCola(size_t pendientes, uint32_t descartados, char* destino, size_t tamano) {
+  return cupo(snprintf(destino, tamano, "{\"pendientes\":%u,\"descartados\":%lu}",
+                       static_cast<unsigned>(pendientes), static_cast<unsigned long>(descartados)),
+              tamano);
+}
+
+bool leerAviso(const char* json, bool& silenciar) {
+  return json != nullptr && leerBooleano(json, "silenciar", silenciar);
 }
 
 bool leerPedidoModo(const char* json, PedidoModo& pedido) {
