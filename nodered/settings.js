@@ -2,6 +2,7 @@
 // pone los secretos en variables de entorno; aquí y en flows.json no hay ninguno.
 const path = require('node:path');
 const { Orquesta } = require('./orquesta.js');
+const { NubeSupabase } = require('./nube.js');
 
 const RAIZ = path.resolve(__dirname, '..');
 
@@ -23,6 +24,10 @@ module.exports = {
       claveHex: process.env.MQTT_AES_KEY_HEX,
       archivo: process.env.ORQUESTA_DATOS || path.join(RAIZ, 'nodered', '.datos', 'orquesta.json'),
       aviso: (texto) => console.warn(`[orquesta] ${texto}`),
+      // Sin SUPABASE_URL y SUPABASE_KEY todo se queda en la laptop.
+      nube: process.env.SUPABASE_URL && process.env.SUPABASE_KEY
+        ? new NubeSupabase({ url: process.env.SUPABASE_URL, llave: process.env.SUPABASE_KEY })
+        : null,
     }),
   },
   logging: { console: { level: 'info', metrics: false, audit: false } },

@@ -711,5 +711,44 @@
     "initialize": "",
     "finalize": "",
     "libs": []
+  },
+  {
+    "id": "orq_tic_nube",
+    "type": "inject",
+    "z": "orq_flujo",
+    "x": 150,
+    "y": 420,
+    "wires": [
+      [
+        "orq_nube"
+      ]
+    ],
+    "name": "cada 10 s",
+    "props": [],
+    "repeat": "10",
+    "crontab": "",
+    "once": true,
+    "onceDelay": 3,
+    "topic": ""
+  },
+  {
+    "id": "orq_nube",
+    "type": "function",
+    "z": "orq_flujo",
+    "x": 400,
+    "y": 420,
+    "wires": [
+      [
+        "orq_wsout"
+      ]
+    ],
+    "name": "subir a Supabase",
+    "func": "// Request/Response con Supabase: solo se quita de la cola lo que Supabase confirmó.\nglobal.get('orquesta').sincronizarNube()\n  .then((r) => { for (const m of r.ws) node.send({ payload: JSON.stringify(m) }); })\n  .catch((error) => node.warn(`Supabase: ${error.message}`));\nreturn null;",
+    "outputs": 1,
+    "timeout": 0,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": []
   }
 ]

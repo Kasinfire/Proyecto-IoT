@@ -1,5 +1,5 @@
 // Peticiones HTTP a Node-RED. Las pantallas nunca hablan con el osito ni con Supabase directo:
-// Node-RED publica en MQTT o consulta Supabase y responde aquí.
+// Node-RED publica en MQTT o responde con lo que guardó (y le pasa una copia a Supabase).
 // En modo ensayo responde el simulador con datos de ejemplo.
 
 import { esEnsayo, simulador } from './conexion.js';

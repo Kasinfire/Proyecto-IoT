@@ -152,8 +152,8 @@ Payload de evento (texto plano antes de cifrar):
 ### Request/Response (justificación para el reporte)
 - **Cambio de modo con confirmación:** el dashboard necesita saber que el osito realmente cambió de modo; un publish sin respuesta no lo garantiza.
 - **Ack de sincronización:** el osito solo borra eventos de su buffer cuando Node-RED confirma que los recibió.
-- **Historial de sesión:** el dashboard consulta `GET /api/sesion/:id` (endpoint HTTP en Node-RED), que a su vez consulta Supabase.
-- **Supabase (HTTPS/REST):** Node-RED guarda con `POST` y consulta con `GET`; cada petición espera su respuesta (código HTTP) para saber si se guardó.
+- **Historial de sesión:** la interfaz consulta `GET /api/historial` (endpoint HTTP en Node-RED), que responde con la copia local para que funcione sin internet.
+- **Supabase (HTTPS/REST):** Node-RED sube niños y sesiones con `POST`/`PATCH`/`DELETE` (`nodered/nube.js`); cada petición espera su código HTTP y solo con un 2xx se da por guardada.
 
 ### Pub/Sub (justificación)
 Eventos continuos y estados con varios consumidores (dashboard, registro de sesión, envío a Supabase) sin que el osito sepa quién escucha.
@@ -172,7 +172,7 @@ Nuevo en este proyecto:
 - **Protección contra replay:** incluir `seq` (contador monotónico) e id de nodo como **AAD** en AES-GCM; el receptor rechaza `seq` repetidos o menores al último aceptado. Aplica en ESP-NOW y en MQTT.
 - **ACLs en Mosquitto:** el usuario del osito solo publica en `orquesta/+/evento`, `orquesta/+/estado`, `orquesta/control/modo/ack`; el usuario de Node-RED solo publica en `orquesta/control/#` y `orquesta/sync/#`.
 - Opcional: `adminAuth` en el editor de Node-RED.
-- **Supabase:** la API key va en una variable de entorno de Node-RED (como `AES_KEY_HEX`), nunca en `flows.json`. RLS activado en las tablas. Los niños se guardan con alias o ID, nunca con su nombre real.
+- **Supabase:** la llave secreta va en `.secrets/mqtt.env` y llega a Node-RED como variable de entorno, nunca en `flows.json`. RLS activado y sin políticas (`nodered/supabase.sql`): con la llave pública no se lee nada. Los niños se guardan con alias, nunca con su nombre; la nota del terapeuta no sale de la laptop.
 
 ### OWASP IoT Top 10, abiertas (actualizar al final)
 - I10: sin flash encryption ni secure boot; la NVS se puede leer con la placa en la mano.
@@ -189,7 +189,7 @@ Nuevo en este proyecto:
 - El osito guarda los eventos sin confirmar: 64 en RAM y el resto en **LittleFS** (`/desborde.bin`, hasta 4000, ~30 min sin red). Mientras no hay red copia la RAM a `/cola.bin`, así que un reinicio tampoco los pierde (detalle en `firmware/osito/README.md`).
 - Al reconectar, reenvía en orden. Node-RED responde `orquesta/sync/ack` con el arranque y el último `seq` recibido sin huecos; el osito borra hasta ahí. Node-RED descarta duplicados por `(arranque, seq)`.
 - Límites documentados: si el desborde se llena, se descarta el evento nuevo y se cuenta; si se va la luz, se pierde como mucho el último segundo (o los últimos 3 s si había red).
-- Segundo nivel (laptop → Supabase): si se cae el internet de la laptop, Node-RED guarda lo pendiente (por ejemplo, en un archivo) y reintenta cada cierto tiempo hasta que Supabase confirme. Sin esto, se perderían los datos de ese tramo.
+- Segundo nivel (laptop → Supabase): Node-RED anota cada operación en `paraLaNube` (en su archivo, sobrevive a reinicios) y la reintenta cada 10–60 s hasta que Supabase responde 2xx (`nodered/README.md`).
 - Nota: los proyectos gratuitos de Supabase se pausan tras varios días sin uso; abrirlo antes de la demo.
 
 Evidencia: apagar el router/hotspot a mitad de una sesión y mostrar que el dashboard recupera todos los eventos al volver.
@@ -261,4 +261,4 @@ Código estructurado y comentado, **sin ninguna credencial visible** (requisito 
 
 - Confirmar variante final de hardware por nodo (barata u original, o mezcla: por ejemplo MPU6050 en el pollito si sobra presupuesto).
 - Canción(es) a incluir.
-- ~~Nube~~ **Decidido:** Supabase como nube (no HiveMQ ni Google Cloud). Pendiente: diseñar las tablas (sesiones, eventos, niños con alias).
+- ~~Nube~~ **Decidido:** Supabase como nube (no HiveMQ ni Google Cloud). Tablas en `nodered/supabase.sql` (niños con alias y sesiones).

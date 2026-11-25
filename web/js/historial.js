@@ -1,5 +1,5 @@
 // Historial de un niño: sus sesiones, su avance en Simón Dice y con qué animal toca más.
-// Los datos los guarda Node-RED en Supabase y aquí se piden a Node-RED (nunca directo a Supabase).
+// Los datos los guarda Node-RED (con copia en Supabase) y aquí se piden a Node-RED, nunca directo a Supabase.
 
 import { cuadroCara, datosAnimal } from './caritas.js';
 import { cuadroAvatar } from './avatar.js';

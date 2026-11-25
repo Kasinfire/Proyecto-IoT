@@ -4,7 +4,8 @@
 'use strict';
 
 const crypto = require('node:crypto');
-const { AlmacenArchivo } = require('./almacen.js');
+const { AlmacenArchivo, paraNube } = require('./almacen.js');
+const { OK, DESCARTAR } = require('./nube.js');
 const arreglo = require('./arreglo.js');
 const { leerAvatar } = require('./avatar.js');
 const { PULSO_MS: PULSO_GRABACION_MS, aMelodia } = require('./grabacion.js');
@@ -35,6 +36,9 @@ const RECIBIDOS_MAX = 512;
 // Arranques del osito de los que se recuerda qué llegó. Tras un reinicio, el osito manda primero lo
 // que guardó en LittleFS (con el arranque viejo) y luego lo nuevo: hacen falta al menos dos.
 const ARRANQUES_MAX = 4;
+// Si Supabase no responde se reintenta con espera creciente, hasta este máximo.
+const ESPERA_NUBE_MIN_MS = 10000;
+const ESPERA_NUBE_MAX_MS = 60000;
 const DIAS = { mes: 31, trimestre: 92, todo: Infinity };
 
 // { seq, data } -> evento. Lanza un error si la clave, el tópico o el seq no son los que se cifraron.
@@ -71,18 +75,23 @@ const resumenVacio = () => ({
 });
 
 class Orquesta {
-  constructor({ claveHex, archivo, almacen = new AlmacenArchivo(archivo), ahora = Date.now, aviso = () => {} }) {
+  constructor({ claveHex, archivo, almacen = new AlmacenArchivo(archivo), nube = null, ahora = Date.now, aviso = () => {} }) {
     if (!/^[0-9a-fA-F]{32}$/.test(claveHex || '')) {
       throw new Error('MQTT_AES_KEY_HEX debe tener 32 caracteres hex');
     }
     this.clave = Buffer.from(claveHex, 'hex');
     this.almacen = almacen;
+    this.nube = nube; // null = sin Supabase: todo se queda en la laptop
+    this.subiendo = false;
+    this.nubeEspera = ESPERA_NUBE_MIN_MS;
+    this.nubeReintentoEn = 0;
     this.ahora = ahora;
     this.aviso = aviso;
     // Lo que se conserva al reiniciar Node-RED.
     this.datos = {
       ninos: [], sesiones: [], sesion: null, siguienteId: 1, avisoSilenciado: false,
       modo: 'cancion', cancion: INCLUIDAS[0].id, canciones: [], siguienteCarga: 1, sync: {}, // sync: { [arranque]: { hasta, recibidos, visto } }
+      paraLaNube: [], nubeAlDia: false, // operaciones que esperan a que Supabase responda
     };
     this.conectado = {};
     this.desconectadoDesde = {};
@@ -114,6 +123,14 @@ class Orquesta {
       this.datos.sync = viejo.arranque == null
         ? {}
         : { [viejo.arranque]: { hasta: viejo.hasta, recibidos: viejo.recibidos ?? [], visto: 0 } };
+    }
+    for (const s of this.datos.sesiones) s.id ??= crypto.randomUUID();
+    if (this.datos.sesion) this.datos.sesion.id ??= crypto.randomUUID();
+    // La primera vez con Supabase se sube todo lo que ya había en la laptop.
+    if (this.nube && !this.datos.nubeAlDia) {
+      for (const n of this.datos.ninos) this.alaNube({ op: 'nino', alias: n.alias, avatar: n.avatar ?? null });
+      for (const s of this.datos.sesiones) this.alaNube({ op: 'sesion', sesion: s });
+      this.datos.nubeAlDia = true;
     }
     // Antes se guardaba el nombre tal cual lo mandaba el osito; ahora es el id.
     if (!this.buscarCancion(this.datos.cancion) && this.datos.cancion !== CANCION_DIAGNOSTICO) {
@@ -224,6 +241,7 @@ class Orquesta {
 
   red(volvio = false) {
     const msg = { tipo: 'red', internet: this.broker !== false && this.ositoEnLinea !== false && this.volvioEn === null, pendientes: this.pendientes, broker: this.broker !== false };
+    if (this.nube) msg.nube_pendientes = this.datos.paraLaNube.length;
     if (volvio) msg.recuperados = this.pendientes;
     if (this.guardado) msg.guardado = this.guardado;
     return msg;
@@ -571,7 +589,7 @@ class Orquesta {
         if (!nino) return error(404, 'ese niño no está en la lista');
         if (this.datos.sesion) return error(409, `ya hay una sesión con ${this.datos.sesion.alias}`);
         this.datos.sesion = {
-          alias: nino.alias, inicio: this.ahora(), modos: [this.datos.modo], aviso: null, resumen: resumenVacio(),
+          id: crypto.randomUUID(), alias: nino.alias, inicio: this.ahora(), modos: [this.datos.modo], aviso: null, resumen: resumenVacio(),
         };
         this.guardar();
         return resp(204, null, [this.mensajeSesion()]);
@@ -579,10 +597,12 @@ class Orquesta {
       case 'POST sesion/terminar': {
         const s = this.datos.sesion;
         if (!s) return error(409, 'no hay una sesión abierta');
-        this.datos.sesiones.push({
-          alias: s.alias, inicio: s.inicio, fin: this.ahora(), modos: s.modos, cancion: this.nombreCancion(),
-          resumen: s.resumen, aviso: s.aviso, nota: String(cuerpo.nota ?? '').slice(0, 2000),
-        });
+        const terminada = {
+          id: s.id ?? crypto.randomUUID(), alias: s.alias, inicio: s.inicio, fin: this.ahora(), modos: s.modos,
+          cancion: this.nombreCancion(), resumen: s.resumen, aviso: s.aviso, nota: String(cuerpo.nota ?? '').slice(0, 2000),
+        };
+        this.datos.sesiones.push(terminada);
+        this.alaNube({ op: 'sesion', sesion: terminada });
         this.datos.sesion = null;
         this.guardar();
         return resp(204, null, [this.mensajeSesion()]);
@@ -658,6 +678,7 @@ class Orquesta {
           if (!nino.avatar) return error(400, 'ese avatar no es válido');
         }
         this.datos.ninos.push(nino);
+        this.alaNube({ op: 'nino', alias, avatar: nino.avatar ?? null });
         this.guardar();
         return resp(200, { alias });
       }
@@ -678,6 +699,8 @@ class Orquesta {
         nino.nombre = nombre;
         if (avatar) nino.avatar = avatar;
         for (const sesion of this.datos.sesiones) if (sesion.alias === viejo) sesion.alias = nuevo;
+        if (viejo !== nuevo) this.alaNube({ op: 'renombrar', de: viejo, a: nuevo });
+        this.alaNube({ op: 'nino', alias: nuevo, avatar: nino.avatar ?? null });
         const abierta = this.datos.sesion?.alias === viejo;
         if (abierta) this.datos.sesion.alias = nuevo;
         this.guardar();
@@ -689,6 +712,7 @@ class Orquesta {
         if (this.datos.sesion?.alias === nino.alias) return error(409, 'está en sesión: termínala antes de borrarlo');
         this.datos.ninos = this.datos.ninos.filter((n) => n !== nino);
         this.datos.sesiones = this.datos.sesiones.filter((x) => x.alias !== nino.alias);
+        this.alaNube({ op: 'borrarNino', alias: nino.alias });
         this.guardar();
         return resp(204);
       }
@@ -697,6 +721,48 @@ class Orquesta {
       default:
         return error(404, 'no existe');
     }
+  }
+
+  // ---------- Nube (Supabase) ----------
+
+  // Se guarda con lo demás (antes de responder), así que ni un corte de internet ni reiniciar
+  // Node-RED la pierden. Solo se sube lo que deja pasar paraNube(): nunca el nombre ni la nota.
+  alaNube(op) {
+    if (!this.nube) return;
+    if (op.op === 'sesion') {
+      const [limpia] = paraNube({ ninos: [], sesiones: [op.sesion], canciones: [] }).sesiones;
+      op = { op: 'sesion', sesion: limpia };
+    }
+    this.datos.paraLaNube.push(op);
+  }
+
+  // La llama un inject cada 10 s. Manda en orden y solo quita una operación cuando Supabase
+  // respondió que la guardó. Devuelve { ws } con el nuevo estado de la red si cambió.
+  async sincronizarNube() {
+    const salida = { ws: [], mqtt: [] };
+    const cola = this.datos.paraLaNube;
+    if (!this.nube || this.subiendo || !cola.length || this.ahora() < this.nubeReintentoEn) return salida;
+    this.subiendo = true;
+    const antes = cola.length;
+    try {
+      while (cola.length) {
+        const { resultado, detalle } = await this.nube.enviar(cola[0]);
+        if (resultado !== OK && resultado !== DESCARTAR) {
+          this.aviso(`Supabase: ${detalle}. Quedan ${cola.length} por subir; reintento en ${this.nubeEspera / 1000} s`);
+          this.nubeReintentoEn = this.ahora() + this.nubeEspera;
+          this.nubeEspera = Math.min(this.nubeEspera * 2, ESPERA_NUBE_MAX_MS);
+          break;
+        }
+        if (resultado === DESCARTAR) this.aviso(`Supabase rechazó ${cola[0].op}: ${detalle}`);
+        cola.shift();
+        this.nubeEspera = ESPERA_NUBE_MIN_MS;
+        this.guardar();
+      }
+    } finally {
+      this.subiendo = false;
+    }
+    if (cola.length !== antes) salida.ws.push(this.red());
+    return salida;
   }
 
   nino(alias) {
