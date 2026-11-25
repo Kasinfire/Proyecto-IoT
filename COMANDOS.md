@@ -244,6 +244,6 @@ Sin esto todo funciona igual, pero el historial solo queda en la laptop.
    ```
 
 5. Reinicia Node-RED. La primera vez sube todo lo que ya había. Revisa en **Table Editor** que
-   aparezcan `ninos` y `sesiones`.
+   aparezcan `ninos`, `sesiones`, `canciones` (las 13 incluidas y las tuyas) y la vista `historial`.
 
 Los proyectos gratis se pausan tras una semana sin uso: ábrelo en el navegador el día antes de la demo.

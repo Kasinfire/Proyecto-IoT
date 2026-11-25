@@ -27,9 +27,15 @@ function nueva(extra = {}) {
   const avisos = [];
   const falso = supabaseFalso();
   const nube = new NubeSupabase({ url: 'https://x.supabase.co/', llave: 'sb_secret_prueba', fetch: falso.fetch });
-  const o = new Orquesta({ claveHex: CLAVE, ahora: () => reloj.t, aviso: (a) => avisos.push(a), nube, ...extra });
+  const { conIncluidas = false, ...resto } = extra;
+  const o = new Orquesta({ claveHex: CLAVE, ahora: () => reloj.t, aviso: (a) => avisos.push(a), nube, ...resto });
+  // Las 13 incluidas se encolan al arrancar con Supabase; cada prueba que no las mira las aparta.
+  if (!conIncluidas) o.datos.paraLaNube = o.datos.paraLaNube.filter((x) => !(x.op === 'cancion' && x.cancion.incluida));
   return { o, reloj, avisos, falso };
 }
+
+const MIA = { nombre: 'Mi canción', tipo: 'alegres', estilo: 'marcha', compas: 8, pulso_ms: 250, melodia: Array(40).fill([60, 2]) };
+const rutas = (falso) => falso.peticiones.map((p) => `${p.metodo} ${p.url.split('/v1/')[1]}`);
 
 function sesionCompleta(o, alias = 'A-07', nota = 'Se llama Ana y hoy lloró') {
   o.alHttp('POST', 'ninos', { alias, nombre: 'Ana López' });
@@ -206,4 +212,63 @@ test('las llaves nuevas van solo en apikey; las viejas (JWT) también en Authori
   await new NubeSupabase({ url: 'https://x.supabase.co', llave: 'eyJhbGciOi', fetch: falso.fetch }).enviar({ op: 'borrarNino', alias: 'A-01' });
   assert.ok(!('Authorization' in falso.peticiones[0].headers));
   assert.strictEqual(falso.peticiones[1].headers.Authorization, 'Bearer eyJhbGciOi');
+});
+
+test('canciones: las incluidas suben una vez y vuelven a subir solo si cambian', async () => {
+  const archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'orq-')), 'o.json');
+  const a = nueva({ archivo, conIncluidas: true });
+  assert.strictEqual(a.o.datos.paraLaNube.length, 13);
+  await a.o.sincronizarNube();
+  assert.strictEqual(a.falso.peticiones.length, 13);
+  const [fila] = a.falso.peticiones[0].cuerpo;
+  assert.strictEqual(fila.id, 'estrellita');
+  assert.strictEqual(fila.incluida, true);
+  assert.ok(Array.isArray(fila.melodia) && Array.isArray(fila.melodia[0]), 'melodía como [[nota, pulsos]]');
+  // Reiniciar Node-RED con las mismas incluidas no vuelve a subirlas.
+  const b = nueva({ archivo, conIncluidas: true });
+  assert.strictEqual(b.o.datos.paraLaNube.length, 0);
+  // Si el firmware trae otras, la huella cambia y se suben de nuevo.
+  const datos = JSON.parse(fs.readFileSync(archivo, 'utf8'));
+  datos.incluidasEnNube = 'otra';
+  fs.writeFileSync(archivo, JSON.stringify(datos));
+  const c = nueva({ archivo, conIncluidas: true });
+  assert.strictEqual(c.o.datos.paraLaNube.length, 13);
+});
+
+test('canciones propias: crear, editar y borrar llegan en orden; las de antes se suben una vez', async () => {
+  const archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'orq-')), 'o.json');
+  // Una canción creada antes de que hubiera Supabase.
+  const sinNube = new Orquesta({ claveHex: CLAVE, archivo });
+  const vieja = sinNube.alHttp('POST', 'canciones', { ...MIA, nombre: 'De antes' }).cuerpo.id;
+  assert.deepStrictEqual(sinNube.datos.paraLaNube, []);
+
+  const { o, falso } = nueva({ archivo });
+  const { id } = o.alHttp('POST', 'canciones', MIA).cuerpo;
+  o.alHttp('POST', 'canciones/editar', { ...MIA, id, nombre: 'Mi canción 2' });
+  o.alHttp('POST', 'canciones/borrar', { id });
+  await o.sincronizarNube();
+  assert.deepStrictEqual(rutas(falso), [
+    'POST canciones?on_conflict=id', 'POST canciones?on_conflict=id', 'POST canciones?on_conflict=id',
+    `DELETE canciones?id=eq.${id}`,
+  ]);
+  assert.strictEqual(falso.peticiones[0].cuerpo[0].id, vieja);
+  assert.strictEqual(falso.peticiones[1].cuerpo[0].nombre, 'Mi canción', 'cada versión en orden');
+  assert.strictEqual(falso.peticiones[2].cuerpo[0].nombre, 'Mi canción 2');
+  assert.strictEqual(falso.peticiones[1].cuerpo[0].incluida, false);
+  // Al reiniciar no se vuelve a subir la de antes.
+  const otra = nueva({ archivo });
+  assert.strictEqual(otra.o.datos.paraLaNube.length, 0);
+});
+
+test('una canción rechazada se aparta y se olvida si la borran', async () => {
+  const { o, falso } = nueva();
+  falso.estado = 400;
+  const { id } = o.alHttp('POST', 'canciones', MIA).cuerpo;
+  await o.sincronizarNube();
+  assert.strictEqual(o.datos.rechazadasNube.length, 1);
+  falso.estado = 204;
+  o.alHttp('POST', 'canciones/borrar', { id });
+  assert.strictEqual(o.datos.rechazadasNube.length, 0);
+  await o.sincronizarNube();
+  assert.deepStrictEqual(rutas(falso).slice(-1), [`DELETE canciones?id=eq.${id}`]);
 });

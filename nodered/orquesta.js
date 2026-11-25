@@ -14,6 +14,7 @@ const NODOS = ['osito', 'ranita', 'gatito', 'pollito'];
 const ANIMALES = ['gatito', 'ranita', 'pollito'];
 const MODOS = ['cancion', 'libre', 'simon'];
 const INCLUIDAS = arreglo.incluidas(); // las trae el osito en su firmware
+const HUELLA_INCLUIDAS = crypto.createHash('sha256').update(JSON.stringify(INCLUIDAS)).digest('hex').slice(0, 16);
 const CANCION_DIAGNOSTICO = 'prueba';
 const CANCIONES_MAX = 200;
 const TECLAS = '123A456B789C*0#Dd';
@@ -132,6 +133,18 @@ class Orquesta {
       for (const n of this.datos.ninos) this.alaNube({ op: 'nino', alias: n.alias, avatar: n.avatar ?? null });
       for (const s of this.datos.sesiones) this.alaNube({ op: 'sesion', sesion: s });
       this.datos.nubeAlDia = true;
+    }
+    if (this.nube) {
+      // Las canciones llegaron después: las propias se suben una vez; las incluidas, cada que el
+      // firmware traiga otras (cambia su huella).
+      if (!this.datos.cancionesEnNube) {
+        for (const c of this.datos.canciones) this.alaNube({ op: 'cancion', cancion: c });
+        this.datos.cancionesEnNube = true;
+      }
+      if (this.datos.incluidasEnNube !== HUELLA_INCLUIDAS) {
+        for (const c of INCLUIDAS) this.alaNube({ op: 'cancion', cancion: c });
+        this.datos.incluidasEnNube = HUELLA_INCLUIDAS;
+      }
     }
     // Antes se guardaba el nombre tal cual lo mandaba el osito; ahora es el id.
     if (!this.buscarCancion(this.datos.cancion) && this.datos.cancion !== CANCION_DIAGNOSTICO) {
@@ -617,6 +630,7 @@ class Orquesta {
         if (motivo) return error(400, motivo);
         cancion.id = `m-${crypto.randomBytes(5).toString('hex')}`;
         this.datos.canciones.push(cancion);
+        this.alaNube({ op: 'cancion', cancion });
         this.guardar();
         return resp(200, { id: cancion.id }, [{ tipo: 'canciones' }]);
       }
@@ -627,6 +641,7 @@ class Orquesta {
         if (motivo) return error(400, motivo);
         Object.assign(vieja, cancion);
         if (this.datos.cancion === vieja.id) this.cancionCambiada = true;
+        this.alaNube({ op: 'cancion', cancion: vieja });
         this.guardar();
         return resp(200, { id: vieja.id }, [{ tipo: 'canciones' }]);
       }
@@ -634,6 +649,7 @@ class Orquesta {
         if (!this.datos.canciones.some((c) => c.id === cuerpo.id)) return error(404, 'esa canción no se puede borrar');
         if (this.datos.cancion === cuerpo.id && this.datos.modo === 'cancion') return error(409, 'está sonando: elige otra antes de borrarla');
         this.datos.canciones = this.datos.canciones.filter((c) => c.id !== cuerpo.id);
+        this.alaNube({ op: 'borrarCancion', id: cuerpo.id });
         this.guardar();
         return resp(204, null, [{ tipo: 'canciones' }]);
       }
@@ -739,12 +755,15 @@ class Orquesta {
         else if (r.op.alias === op.de) r.op.alias = op.a;
       }
     }
+    if (op.op === 'borrarCancion') this.datos.rechazadasNube = this.datos.rechazadasNube.filter((r) => r.op.cancion?.id !== op.id);
     // Si alguna vez hubo nube se anota aunque ahora esté apagada: allá hay datos que borrar o cambiar.
     if (!this.nube && !this.datos.nubeAlDia) return;
     if (op.op === 'sesion') {
       const [limpia] = paraNube({ ninos: [], sesiones: [op.sesion], canciones: [] }).sesiones;
       op = { op: 'sesion', sesion: limpia };
     }
+    // Copia: si la editan antes de que suba, se sube cada versión en orden.
+    if (op.op === 'cancion') op = { op: 'cancion', cancion: structuredClone(op.cancion) };
     this.datos.paraLaNube.push(op);
   }
 
