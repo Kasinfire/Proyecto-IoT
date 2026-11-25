@@ -82,7 +82,7 @@ test('la espera crece hasta 60 s y vuelve a 10 s al funcionar', async () => {
   assert.strictEqual(o.nubeEspera, 10000);
 });
 
-test('una llave mal puesta (401) no tira nada; un dato inválido (400) se descarta y avisa', async () => {
+test('una llave mal puesta (401) no tira nada; un dato inválido (400) se aparta y avisa', async () => {
   const { o, reloj, falso, avisos } = nueva();
   falso.estado = 401;
   sesionCompleta(o);
@@ -93,6 +93,51 @@ test('una llave mal puesta (401) no tira nada; un dato inválido (400) se descar
   await o.sincronizarNube();
   assert.strictEqual(o.datos.paraLaNube.length, 0);
   assert.ok(avisos.some((a) => a.includes('rechazó')));
+  assert.deepStrictEqual(o.datos.rechazadasNube.map((r) => r.op.op), ['nino', 'sesion']);
+  assert.ok(!JSON.stringify(o.datos.rechazadasNube).includes('Ana'));
+});
+
+test('tablas sin crear (404): no se pierde nada y se sube al crearlas', async () => {
+  const { o, reloj, falso } = nueva();
+  falso.estado = 404;
+  sesionCompleta(o);
+  await o.sincronizarNube();
+  assert.strictEqual(o.datos.paraLaNube.length, 2);
+  assert.strictEqual(o.datos.rechazadasNube.length, 0);
+  falso.estado = 201;
+  reloj.t += 10000;
+  await o.sincronizarNube();
+  assert.strictEqual(o.datos.paraLaNube.length, 0);
+});
+
+test('si falta el niño de una sesión (409) se crea y la sesión se sube', async () => {
+  const hechas = [];
+  let hayNino = false;
+  const fetch = async (url, { headers }) => {
+    const tabla = url.split('/v1/')[1].split('?')[0];
+    hechas.push(`${tabla} ${headers.Prefer.split(',')[0]}`);
+    if (tabla === 'ninos') hayNino = true;
+    const estado = tabla === 'sesiones' && !hayNino ? 409 : 201;
+    return { ok: estado < 300, status: estado, text: async () => 'llave foranea' };
+  };
+  const nube = new NubeSupabase({ url: 'https://x', llave: 'sb_secret_x', fetch });
+  const sesion = { id: 'x', alias: 'A-01', inicio: 1, fin: 2, modos: [], cancion: 'c', resumen: {} };
+  assert.strictEqual((await nube.enviar({ op: 'sesion', sesion })).resultado, 'ok');
+  assert.deepStrictEqual(hechas, ['sesiones resolution=merge-duplicates', 'ninos resolution=ignore-duplicates', 'sesiones resolution=merge-duplicates']);
+});
+
+test('lo apartado sobrevive a reiniciar, cambia de alias con el niño y se borra con él', async () => {
+  const archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'orq-')), 'o.json');
+  const a = nueva({ archivo });
+  a.falso.estado = 400;
+  sesionCompleta(a.o, 'A-07');
+  await a.o.sincronizarNube();
+  const b = nueva({ archivo });
+  assert.strictEqual(b.o.datos.rechazadasNube.length, 2);
+  b.o.alHttp('POST', 'ninos/editar', { alias: 'A-07', nuevo_alias: 'A-08', nombre: '' });
+  assert.ok(!JSON.stringify(b.o.datos.rechazadasNube).includes('A-07'));
+  b.o.alHttp('POST', 'ninos/borrar', { alias: 'A-08' });
+  assert.strictEqual(b.o.datos.rechazadasNube.length, 0);
 });
 
 test('editar y borrar niños: renombrar, avatar y borrado en cascada', async () => {

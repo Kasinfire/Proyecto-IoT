@@ -3,8 +3,8 @@
 // Solo recibe lo que ya pasó por paraNube(): nunca el nombre del niño ni la nota de la sesión.
 'use strict';
 
-// Resultado de enviar(): ok, reintentar (red caída, Supabase pausado, llave mal) o descartar
-// (Supabase dice que el dato no es válido: repetirlo no lo va a arreglar).
+// Resultado de enviar(): ok, reintentar (red caída, Supabase pausado, llave mal, tablas sin crear) o
+// descartar (Supabase dice que el dato no es válido: repetirlo no lo arregla; orquesta.js lo aparta).
 const OK = 'ok';
 const REINTENTAR = 'reintentar';
 const DESCARTAR = 'descartar';
@@ -38,17 +38,22 @@ class NubeSupabase {
           id: s.id, alias: s.alias, inicio: new Date(s.inicio).toISOString(), fin: new Date(s.fin).toISOString(),
           modos: s.modos, cancion: s.cancion, resumen: s.resumen, aviso: s.aviso ?? null,
         };
-        return this.pedir('POST', 'sesiones?on_conflict=id', [fila], true);
+        const subir = () => this.pedir('POST', 'sesiones?on_conflict=id', [fila], true);
+        const primero = await subir();
+        if (primero.estado !== 409) return primero;
+        // Falta su niño en la nube: se crea (sin tocar su avatar si ya está) y se intenta otra vez.
+        const nino = await this.pedir('POST', 'ninos?on_conflict=alias', [{ alias: s.alias }], true, 'ignore-duplicates');
+        return nino.resultado === OK ? subir() : nino;
       }
       default:
         return { resultado: DESCARTAR, detalle: `operación desconocida: ${op.op}` };
     }
   }
 
-  async pedir(metodo, ruta, cuerpo, upsert = false) {
+  async pedir(metodo, ruta, cuerpo, upsert = false, siExiste = 'merge-duplicates') {
     const headers = { ...this.cabeceras };
     // Repetir una operación (si se cortó la red tras guardar) no duplica nada.
-    if (upsert) headers.Prefer = 'resolution=merge-duplicates,return=minimal';
+    if (upsert) headers.Prefer = `resolution=${siExiste},return=minimal`;
     let respuesta;
     try {
       respuesta = await this.fetch(`${this.base}/${ruta}`, {
@@ -61,9 +66,10 @@ class NubeSupabase {
     if (respuesta.ok) return { resultado: OK };
     const texto = await respuesta.text().catch(() => '');
     const detalle = `Supabase respondió ${respuesta.status}: ${texto.slice(0, 200)}`;
-    // 401/403: la llave está mal o falta una política; 408/429/5xx: pasajero. Ninguno se tira.
-    const pasajero = [401, 403, 408, 429].includes(respuesta.status) || respuesta.status >= 500;
-    return { resultado: pasajero ? REINTENTAR : DESCARTAR, detalle };
+    // 401/403: la llave está mal o falta una política; 404: tablas sin crear o URL mal; 408/429/5xx:
+    // pasajero. Todos se arreglan sin cambiar el dato, así que se reintentan.
+    const pasajero = [401, 403, 404, 408, 429].includes(respuesta.status) || respuesta.status >= 500;
+    return { resultado: pasajero ? REINTENTAR : DESCARTAR, detalle, estado: respuesta.status };
   }
 }
 

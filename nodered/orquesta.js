@@ -92,6 +92,7 @@ class Orquesta {
       ninos: [], sesiones: [], sesion: null, siguienteId: 1, avisoSilenciado: false,
       modo: 'cancion', cancion: INCLUIDAS[0].id, canciones: [], siguienteCarga: 1, sync: {}, // sync: { [arranque]: { hasta, recibidos, visto } }
       paraLaNube: [], nubeAlDia: false, // operaciones que esperan a que Supabase responda
+      rechazadasNube: [], // las que Supabase no aceptó: se apartan para no detener las demás ni perderlas
     };
     this.conectado = {};
     this.desconectadoDesde = {};
@@ -728,6 +729,15 @@ class Orquesta {
   // Se guarda con lo demás (antes de responder), así que ni un corte de internet ni reiniciar
   // Node-RED la pierden. Solo se sube lo que deja pasar paraNube(): nunca el nombre ni la nota.
   alaNube(op) {
+    // Lo apartado sigue al niño: si lo borran no queda nada suyo, y si cambia de alias también cambia.
+    const aliasDe = (r) => r.op.sesion?.alias ?? r.op.alias;
+    if (op.op === 'borrarNino') this.datos.rechazadasNube = this.datos.rechazadasNube.filter((r) => aliasDe(r) !== op.alias);
+    if (op.op === 'renombrar') {
+      for (const r of this.datos.rechazadasNube) {
+        if (r.op.sesion?.alias === op.de) r.op.sesion.alias = op.a;
+        else if (r.op.alias === op.de) r.op.alias = op.a;
+      }
+    }
     if (!this.nube) return;
     if (op.op === 'sesion') {
       const [limpia] = paraNube({ ninos: [], sesiones: [op.sesion], canciones: [] }).sesiones;
@@ -753,8 +763,15 @@ class Orquesta {
           this.nubeEspera = Math.min(this.nubeEspera * 2, ESPERA_NUBE_MAX_MS);
           break;
         }
-        if (resultado === DESCARTAR) this.aviso(`Supabase rechazó ${cola[0].op}: ${detalle}`);
-        cola.shift();
+        const hecha = cola.shift();
+        if (resultado === DESCARTAR) {
+          this.aviso(`Supabase rechazó ${hecha.op}: ${detalle}. Queda apartada en esta laptop`);
+          // Si mientras tanto borraron a ese niño, no se guarda nada suyo.
+          const deQuien = hecha.sesion?.alias ?? hecha.alias;
+          if (!cola.some((x) => x.op === 'borrarNino' && x.alias === deQuien)) {
+            this.datos.rechazadasNube.push({ op: hecha, detalle, cuando: this.ahora() });
+          }
+        }
         this.nubeEspera = ESPERA_NUBE_MIN_MS;
         this.guardar();
       }

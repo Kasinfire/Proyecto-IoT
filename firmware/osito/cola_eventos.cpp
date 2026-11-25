@@ -1,5 +1,7 @@
 #include "cola_eventos.h"
 
+#include <protocolo.h>
+
 #include <cstring>
 
 namespace cola_eventos {
@@ -7,6 +9,7 @@ namespace {
 struct Entrada {
   Registro registro;
   bool publicado;
+  bool del_desborde;  // sigue en la flash hasta que se confirme
 };
 
 static_assert(config::EVENTO_JSON_MAX <= 256, "el largo del JSON se exporta en un byte");
@@ -27,10 +30,11 @@ Entrada& en(size_t k) {
   return entradas[(inicio + k) % config::CAPACIDAD_COLA_MQTT];
 }
 
-void meterEnRam(const Registro& registro) {
+void meterEnRam(const Registro& registro, bool del_desborde = false) {
   Entrada& nueva = en(cantidad);
   nueva.registro = registro;
   nueva.publicado = false;
+  nueva.del_desborde = del_desborde;
   ++cantidad;
   ++num_version;
 }
@@ -39,9 +43,30 @@ void meterEnRam(const Registro& registro) {
 void rellenar() {
   Registro registro;
   while (desborde != nullptr && cantidad < config::CAPACIDAD_COLA_MQTT &&
-         desborde->cantidad() > 0 && desborde->sacar(registro)) {
-    meterEnRam(registro);
+         desborde->cantidad() > 0) {
+    const Lectura lectura = desborde->sacar(registro);
+    if (lectura == Lectura::Vacio) {
+      break;
+    }
+    if (lectura == Lectura::Danado) {
+      ++num_descartados;
+      continue;
+    }
+    meterEnRam(registro, true);
   }
+}
+
+// El archivo se borra solo cuando todo lo que salió de él ya tiene acuse.
+void liberarDesborde() {
+  if (desborde == nullptr || desborde->cantidad() > 0) {
+    return;
+  }
+  for (size_t k = 0; k < cantidad; ++k) {
+    if (en(k).del_desborde) {
+      return;
+    }
+  }
+  desborde->vaciar();
 }
 
 void escribir32(uint8_t* p, uint32_t valor) {
@@ -58,6 +83,12 @@ uint32_t leer32(const uint8_t* p) {
   return valor;
 }
 }  // namespace
+
+bool registroValido(const Registro& registro) {
+  const size_t largo = strnlen(registro.json, sizeof(registro.json));
+  return registro.nodo < protocolo::NUM_NODOS && largo >= 2 && largo < sizeof(registro.json) &&
+         registro.json[0] == '{' && registro.json[largo - 1] == '}';
+}
 
 void reiniciar() {
   inicio = 0;
@@ -153,6 +184,7 @@ size_t confirmarHasta(uint32_t arranque, uint32_t hasta_seq) {
     ++num_version;
   }
   rellenar();
+  liberarDesborde();
   return borrados;
 }
 
@@ -237,7 +269,11 @@ bool importar(const uint8_t* origen, size_t tamano) {
     r.seq = leer32(origen + pos + 4);
     r.nodo = origen[pos + 8];
     memcpy(r.json, origen + pos + 10, origen[pos + 9]);
-    meterEnRam(r);
+    if (registroValido(r)) {
+      meterEnRam(r);
+    } else {
+      ++num_descartados;
+    }
     pos += 10 + origen[pos + 9];
   }
   return true;
