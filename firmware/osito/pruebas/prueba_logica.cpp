@@ -1279,11 +1279,12 @@ class DesbordeFalso : public cola_eventos::Desborde {
     registros_[n_++] = r;
     return true;
   }
-  bool sacar(cola_eventos::Registro& r) override {
-    if (leidos_ == n_) return false;
+  cola_eventos::Lectura sacar(cola_eventos::Registro& r) override {
+    if (leidos_ == n_) return cola_eventos::Lectura::Vacio;
     r = registros_[leidos_++];
-    return true;
+    return cola_eventos::Lectura::Ok;
   }
+  void vaciar() override { n_ = leidos_ = 0; }
   size_t cantidad() const override { return n_ - leidos_; }
 
  private:
