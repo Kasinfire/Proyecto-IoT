@@ -24,13 +24,20 @@ struct Registro {
   char json[config::EVENTO_JSON_MAX];
 };
 
-// Donde va lo que no cabe en RAM. Primero en entrar, primero en salir.
+// ¿Se puede publicar? Uno dañado en la flash nunca se podría cifrar y detendría la cola.
+bool registroValido(const Registro& registro);
+
+enum class Lectura : uint8_t { Ok, Vacio, Danado };
+
+// Donde va lo que no cabe en RAM. Primero en entrar, primero en salir. Lo que ya salió se conserva
+// hasta vaciar(): si se va la luz antes del acuse, no se pierde.
 class Desborde {
  public:
   virtual ~Desborde() = default;
   virtual bool meter(const Registro& registro) = 0;  // false si está lleno o falló la escritura
-  virtual bool sacar(Registro& registro) = 0;        // el más viejo
-  virtual size_t cantidad() const = 0;
+  virtual Lectura sacar(Registro& registro) = 0;     // el más viejo; Danado = se salta uno
+  virtual size_t cantidad() const = 0;               // los que faltan por salir
+  virtual void vaciar() = 0;                         // todo lo que salió ya se confirmó
 };
 
 void reiniciar();

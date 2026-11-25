@@ -148,6 +148,8 @@ constexpr size_t ENTRANTE_MAX = 256;
 constexpr size_t CAPACIDAD_COLA_MQTT = 64;
 // Desborde en LittleFS: 4000 x 172 B = ~690 KB de los ~1.5 MB de la partición; ~30 min sin red.
 constexpr size_t DESBORDE_MAX = 4000;
+// Lo ya enviado sigue en el archivo hasta el acuse: con esto (~1 MB) cabe todavía en la partición.
+constexpr size_t DESBORDE_ARCHIVO_MAX = 6000;
 // La RAM se copia a LittleFS solo si el evento más viejo lleva este tiempo sin acuse (no hay red),
 // y como mucho una vez por GUARDAR_COLA_CADA_MS. Con red no se escribe en la flash.
 constexpr uint32_t ESPERA_PARA_GUARDAR_COLA_MS = 3000;

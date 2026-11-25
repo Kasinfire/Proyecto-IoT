@@ -13,3 +13,6 @@ c++ -std=c++17 -Wall -Wextra -I"$AQUI/stubs" -I"$COMUN" -I"$OSITO" \
   "$OSITO/contrato_mqtt.cpp" "$OSITO/cola_eventos.cpp" \
   -o "$SALIDA"
 "$SALIDA"
+c++ -std=c++17 -Wall -Wextra -I"$AQUI/stubs_flash" -I"$AQUI/stubs" -I"$COMUN" -I"$OSITO" \
+  "$AQUI/prueba_persistente.cpp" -o "${SALIDA}_persistente"
+"${SALIDA}_persistente"
