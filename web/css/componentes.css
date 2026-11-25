@@ -1,0 +1,536 @@
+/* Piezas que se repiten entre pantallas: encabezado, botones, tarjetas, avisos. */
+
+/* ---------- Encabezado y menú ---------- */
+
+.encabezado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.marca span {
+  font-weight: 500;
+  color: var(--tinta-tenue);
+}
+
+.marca__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--osito-claro);
+  display: grid;
+  place-items: center;
+}
+
+.menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 999px;
+  background: var(--relleno-nav);
+}
+
+.menu a {
+  min-height: var(--objetivo-min);
+  padding: 0 16px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.menu a[aria-current="page"] {
+  background: var(--lima);
+  font-weight: 800;
+}
+
+.encabezado__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ---------- Botones ---------- */
+
+.boton {
+  min-height: var(--objetivo-min);
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  background: var(--relleno);
+}
+
+.boton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Una sola acción principal por pantalla */
+.boton--principal {
+  background: var(--violeta);
+  color: #ffffff;
+}
+
+.boton--blanco {
+  background: #ffffff;
+}
+
+.boton--sesion {
+  background: var(--lima-claro);
+  padding-right: 12px;
+}
+
+.boton--alerta {
+  background: var(--alerta-texto);
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.boton--bien {
+  background: var(--bien-boton);
+  color: #ffffff;
+  font-size: 13px;
+}
+
+.boton--aviso {
+  background: var(--aviso-boton);
+  color: #ffffff;
+  font-size: 13px;
+}
+
+/* ---------- Pie de página ---------- */
+
+.pie {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px solid var(--relleno-encima);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tinta-tenue);
+}
+
+.pie__marca strong {
+  font-weight: 800;
+  color: var(--tinta);
+}
+
+.pie__ensayo {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--lila);
+  color: #3d3a52;
+  font-weight: 700;
+}
+
+/* ---------- Caritas de los animales ---------- */
+
+.cara {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.cuadro-cara {
+  flex: none;
+  border-radius: var(--radio-chico);
+  display: grid;
+  place-items: center;
+}
+
+/* ---------- Avisos ---------- */
+
+.alerta {
+  width: min(600px, 100%);
+  padding: 12px 12px 12px 14px;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px var(--alerta-fondo);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  animation: alerta-entra 0.25s ease-out;
+}
+
+@keyframes alerta-entra {
+  from { opacity: 0; transform: translateY(-12px); }
+}
+
+.alerta__texto {
+  flex: 1;
+  min-width: 0;
+}
+
+.alerta__titulo {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--alerta-texto);
+}
+
+.alerta__ayuda {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tinta-suave);
+}
+
+.alerta__acciones {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.alerta__cerrar {
+  width: var(--objetivo-min);
+  height: var(--objetivo-min);
+  border: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--tinta-suave);
+  transition: background-color 0.15s ease;
+}
+
+.alerta__cerrar:hover {
+  background: var(--relleno);
+}
+
+/* ---------- Selector ---------- */
+
+.campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.campo label {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.selector,
+.entrada {
+  min-height: var(--objetivo-min);
+  min-width: 160px;
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radio-chico);
+  background: var(--relleno);
+  font-weight: 600;
+}
+
+/* Un campo de texto sí necesita borde visible (WCAG 1.4.11): contorno de 3.2:1 */
+.entrada {
+  min-height: 52px;
+  padding: 12px 16px;
+  border: 2px solid #8a8a82;
+  border-radius: var(--radio-chico);
+  background: #ffffff;
+  font-size: 16px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.entrada:hover {
+  border-color: var(--tinta-suave);
+}
+
+/* Al escribir: el borde se pinta de violeta con un halo suave, sin el contorno cuadrado de afuera */
+.entrada:focus,
+.entrada:focus-visible {
+  outline: none;
+  border-color: var(--violeta);
+  box-shadow: 0 0 0 4px rgb(104 88 212 / 18%);
+}
+
+textarea.entrada {
+  resize: vertical;
+  line-height: 1.4;
+}
+
+/* Desplegable propio (js/selector.js): la lista del sistema no se puede pintar con estos colores */
+.desplegable {
+  position: relative;
+  min-width: 160px;
+}
+
+.desplegable__boton {
+  width: 100%;
+  min-height: var(--objetivo-min);
+  padding: 0 12px 0 14px;
+  border: none;
+  border-radius: var(--radio-chico);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--relleno);
+  font-weight: 600;
+  text-align: left;
+}
+
+.desplegable__texto {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.desplegable__boton svg {
+  flex: none;
+  color: var(--tinta-suave);
+  transform: rotate(90deg);
+  transition: transform 0.2s ease;
+}
+
+.desplegable__boton:not(:disabled):hover,
+.esta-abierto .desplegable__boton {
+  background: var(--relleno-encima);
+}
+
+.esta-abierto .desplegable__boton svg {
+  transform: rotate(-90deg);
+}
+
+.desplegable__boton:disabled {
+  cursor: default;
+  color: var(--tinta-tenue);
+}
+
+.desplegable__lista {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  border-radius: var(--radio);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgb(28 28 26 / 6%), 0 14px 36px rgb(28 28 26 / 16%);
+  animation: desplegar 0.14s ease-out;
+}
+
+.hacia-arriba .desplegable__lista {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.desplegable__lista:focus {
+  outline: none;
+}
+
+.desplegable__opcion {
+  min-height: var(--objetivo-min);
+  padding: 0 12px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.desplegable__opcion.es-activa { background: var(--relleno); }
+.desplegable__opcion[aria-selected="true"] { background: var(--lima); font-weight: 800; }
+.desplegable__opcion[aria-selected="true"].es-activa { background: var(--lima-encima); }
+.desplegable__opcion[aria-disabled="true"] { opacity: 0.5; cursor: default; }
+
+/* Con teclado, la opción marcada lleva el mismo contorno que el foco */
+.desplegable__lista:focus-visible .es-activa {
+  outline: 3px solid var(--violeta);
+  outline-offset: -3px;
+}
+
+@keyframes desplegar {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+.hacia-arriba .desplegable__lista { animation-name: desplegar-arriba; }
+
+@keyframes desplegar-arriba {
+  from { opacity: 0; transform: translateY(4px); }
+}
+
+/* ---------- Al pasar el mouse y al presionar ---------- */
+
+.boton,
+.menu a,
+.desplegable__boton {
+  transition: background-color 0.15s ease, filter 0.15s ease, transform 0.1s ease;
+}
+
+.menu a:not([aria-current="page"]):hover {
+  background: #ffffff;
+}
+
+/* Un solo efecto para todos los botones: se oscurecen un poco, sea cual sea su color */
+.boton:not(:disabled):hover {
+  filter: brightness(0.94);
+}
+
+.boton:not(:disabled):active,
+.menu a:active,
+.desplegable__boton:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+/* ---------- Ventanas (dialog) ---------- */
+
+.ventana {
+  width: min(500px, 90vw);
+  border: none;
+  border-radius: 28px;
+  padding: 32px;
+  box-shadow: 0 24px 60px rgb(28 28 26 / 25%);
+}
+
+.ventana::backdrop {
+  background: rgb(28 28 26 / 45%);
+}
+
+.ventana__contenido {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.ventana__titulo {
+  font-size: 26px;
+  font-weight: 800;
+}
+
+/* Dentro de una ventana el campo respira más y su etiqueta se lee mejor */
+.ventana .campo {
+  gap: 8px;
+}
+
+.ventana .campo label {
+  font-size: 15px;
+}
+
+.ventana .texto-ayuda {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.ventana__acciones {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.ventana__datos {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.ventana__dato {
+  border-radius: var(--radio);
+  padding: 14px 16px;
+  background: var(--superficie);
+}
+
+.ventana__dato small {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ventana__dato strong {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.ventana__error {
+  color: var(--alerta-texto);
+  font-weight: 700;
+}
+
+/* ---------- Tarjeta de dato (resumen) ---------- */
+
+.dato {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: var(--radio-grande);
+  padding: 22px 26px;
+  background: var(--superficie);
+}
+
+.dato__titulo {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.dato__valor {
+  font-size: 34px;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dato__ayuda {
+  font-size: 14px;
+  font-weight: 500;
+  color: #3d3d38;
+}
+
+/* ---------- Marca de confirmado (palomita) ---------- */
+
+.palomita {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--tinta);
+  display: grid;
+  place-items: center;
+}
+
+@media (max-width: 720px) {
+  .menu {
+    order: 3;
+    width: 100%;
+  }
+}
+
+@media (max-width: 560px) {
+  .alerta { flex-wrap: wrap; }
+  .alerta__texto { flex: 1 1 180px; }
+  .alerta__acciones { width: 100%; justify-content: space-between; }
+}

@@ -1,0 +1,120 @@
+#include "teclado_dj.h"
+
+#include <Arduino.h>
+
+#include "acciones_dj.h"
+#include "config.h"
+#include "filtro_boton.h"
+#include "pines.h"
+#include "pulsacion_larga.h"
+
+namespace teclado_dj {
+namespace {
+using acciones_dj::COLUMNAS;
+using acciones_dj::FILAS;
+
+constexpr size_t COLA_MAX = 8;
+// Tiempo para que la fila baje antes de leer las columnas (cables largos de la membrana).
+constexpr uint32_t ASENTAR_US = 5;
+
+FiltroBoton filtros[FILAS][COLUMNAS] = {
+    {FiltroBoton(config::BOTON_ESTABLE_MS), FiltroBoton(config::BOTON_ESTABLE_MS),
+     FiltroBoton(config::BOTON_ESTABLE_MS), FiltroBoton(config::BOTON_ESTABLE_MS)},
+    {FiltroBoton(config::BOTON_ESTABLE_MS), FiltroBoton(config::BOTON_ESTABLE_MS),
+     FiltroBoton(config::BOTON_ESTABLE_MS), FiltroBoton(config::BOTON_ESTABLE_MS)},
+    {FiltroBoton(config::BOTON_ESTABLE_MS), FiltroBoton(config::BOTON_ESTABLE_MS),
+     FiltroBoton(config::BOTON_ESTABLE_MS), FiltroBoton(config::BOTON_ESTABLE_MS)},
+    {FiltroBoton(config::BOTON_ESTABLE_MS), FiltroBoton(config::BOTON_ESTABLE_MS),
+     FiltroBoton(config::BOTON_ESTABLE_MS), FiltroBoton(config::BOTON_ESTABLE_MS)},
+};
+constexpr char TECLA_LARGA = 'D';
+PulsacionLarga larga(config::TECLA_LARGA_MS);
+struct Pulsada {
+  char tecla;
+  Origen origen;
+};
+Pulsada cola[COLA_MAX];
+size_t inicio = 0;
+size_t cuantas = 0;
+
+void meter(char tecla, Origen origen) {
+  if (cuantas == COLA_MAX) {  // llena: se pierde la más vieja
+    inicio = (inicio + 1) % COLA_MAX;
+    --cuantas;
+  }
+  cola[(inicio + cuantas) % COLA_MAX] = {tecla, origen};
+  ++cuantas;
+}
+
+// Con la fila en LOW, una tecla presionada baja su columna (que tiene pull-up).
+void leerFila(size_t fila, bool abajo[COLUMNAS]) {
+  digitalWrite(pines::TECLADO_FILAS[fila], LOW);
+  delayMicroseconds(ASENTAR_US);
+  for (size_t c = 0; c < COLUMNAS; ++c) {
+    abajo[c] = digitalRead(pines::TECLADO_COLUMNAS[c]) == LOW;
+  }
+  digitalWrite(pines::TECLADO_FILAS[fila], HIGH);
+}
+}  // namespace
+
+void iniciar() {
+  for (uint8_t pin : pines::TECLADO_FILAS) {
+    pinMode(pin, OUTPUT);
+    digitalWrite(pin, HIGH);
+  }
+  for (uint8_t pin : pines::TECLADO_COLUMNAS) {
+    pinMode(pin, INPUT_PULLUP);
+  }
+  const uint32_t ahora_ms = millis();
+  bool abajo[COLUMNAS];
+  for (size_t f = 0; f < FILAS; ++f) {
+    leerFila(f, abajo);
+    for (size_t c = 0; c < COLUMNAS; ++c) {
+      filtros[f][c].iniciar(abajo[c], ahora_ms);
+      if (acciones_dj::TECLAS[f][c] == TECLA_LARGA) {
+        larga.iniciar(abajo[c]);
+      }
+    }
+  }
+}
+
+void actualizar() {
+  const uint32_t ahora_ms = millis();
+  bool abajo[COLUMNAS];
+  for (size_t f = 0; f < FILAS; ++f) {
+    leerFila(f, abajo);
+    for (size_t c = 0; c < COLUMNAS; ++c) {
+      filtros[f][c].actualizar(abajo[c], ahora_ms);
+      const bool se_presiono = filtros[f][c].sePresiono();
+      if (acciones_dj::TECLAS[f][c] == TECLA_LARGA) {
+        const PulsacionLarga::Tipo tipo = larga.actualizar(filtros[f][c].presionado(), ahora_ms);
+        if (tipo != PulsacionLarga::Tipo::Nada) {
+          meter(tipo == PulsacionLarga::Tipo::Larga ? acciones_dj::TECLA_D_LARGA : TECLA_LARGA,
+                Origen::Fisica);
+        }
+      } else if (se_presiono) {
+        meter(acciones_dj::TECLAS[f][c], Origen::Fisica);
+      }
+    }
+  }
+}
+
+bool siguienteTecla(char& tecla, Origen& origen) {
+  if (cuantas == 0) {
+    return false;
+  }
+  tecla = cola[inicio].tecla;
+  origen = cola[inicio].origen;
+  inicio = (inicio + 1) % COLA_MAX;
+  --cuantas;
+  return true;
+}
+
+void meterRemota(char tecla) {
+  meter(tecla, Origen::Remota);
+}
+
+void simularTecla(char tecla) {
+  meter(tecla, Origen::Simulada);
+}
+}  // namespace teclado_dj

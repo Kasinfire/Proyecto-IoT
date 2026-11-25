@@ -1,0 +1,6 @@
+{
+  "orq_broker": {
+    "user": "${NODERED_USER}",
+    "password": "${NODERED_PASSWORD}"
+  }
+}

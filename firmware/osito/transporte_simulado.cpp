@@ -4,7 +4,8 @@
 
 void TransporteSimulado::iniciar(AlMensaje al_mensaje) {
   al_mensaje_ = al_mensaje;
-  Serial.println("[MQTT-SIMULACIÓN] Sin broker real configurado; nada sale de la placa");
+  Serial.println("[MQTT-SIMULACIÓN] \"sim mqtt on\" y luego \"sim mqtt modo ...\" inyectan "
+                 "pedidos; nada de esto se publica en el broker real");
 }
 
 bool TransporteSimulado::publicar(const char* topico, const char* payload, bool retenido) {

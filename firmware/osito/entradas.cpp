@@ -62,10 +62,11 @@ bool huboCambioVolumen() {
   return hubo;
 }
 
-bool sePresionoModo() {
-  const bool simulada = presion_simulada;
+bool sePresionoModo(bool& simulada) {
+  const bool real = boton.sePresiono();
+  simulada = !real && presion_simulada;
   presion_simulada = false;
-  return boton.sePresiono() || simulada;
+  return real || simulada;
 }
 
 void simularPresionModo() {

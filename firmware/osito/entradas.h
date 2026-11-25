@@ -9,7 +9,8 @@ void actualizar();
 
 uint8_t volumen();  // 0..config::VOLUMEN_MAX (escala MIDI)
 bool huboCambioVolumen();
-bool sePresionoModo();
+// simulada: la pulsación vino de "sim boton" (no se publica en el broker real).
+bool sePresionoModo(bool& simulada);
 
 // Para la simulación: cuenta como una pulsación, marcada como SIMULACIÓN por quien la llama.
 void simularPresionModo();

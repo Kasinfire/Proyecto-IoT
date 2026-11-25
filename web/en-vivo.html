@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sesión en vivo · Orquesta</title>
+<link rel="icon" href="icono.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/base.css">
+<link rel="stylesheet" href="css/componentes.css">
+<link rel="stylesheet" href="css/pantallas.css">
+</head>
+<body>
+<div class="pagina">
+
+<header class="encabezado">
+  <div class="marca"><div class="marca__logo" data-logo></div><p>Orquesta<span>Kids</span></p></div>
+  <nav class="menu" aria-label="Secciones">
+    <a href="en-vivo.html" aria-current="page">En vivo</a>
+    <a href="historial.html">Historial</a>
+    <a href="canciones.html">Canciones</a>
+    <a href="ninos.html">Niños</a>
+  </nav>
+  <div class="encabezado__acciones">
+    <a class="boton" href="proyector.html" target="_blank" rel="noopener">Abrir en proyector</a>
+    <a class="boton boton--principal" href="ninos.html" id="iniciar" hidden>Iniciar sesión</a>
+    <button class="boton" type="button" id="terminar" hidden>Terminar sesión</button>
+  </div>
+</header>
+
+
+
+<div class="titulo-en-vivo">
+<div class="titulo-en-vivo__quien"><div id="avatar"></div><h1 class="titulo-pagina" id="titulo">Sesión en vivo</h1></div>
+<!-- Comparte la fila del título para no tapar los controles. El LED rojo del osito también avisa. -->
+<section class="alerta" id="alerta" role="alert" hidden>
+  <div class="cuadro-cara" id="alerta-cara" style="width: 44px; height: 44px; background: var(--alerta-fondo)"></div>
+  <div class="alerta__texto">
+    <p class="alerta__titulo" id="alerta-titulo"></p>
+    <p class="alerta__ayuda" id="alerta-ayuda"></p>
+  </div>
+  <div class="alerta__acciones">
+    <button class="boton boton--alerta" type="button" id="silenciar" aria-pressed="false">Silenciar sonido</button>
+    <button class="alerta__cerrar" type="button" id="cerrar-alerta" aria-label="Cerrar aviso">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+</section>
+</div>
+
+<div class="en-vivo">
+  <section class="orquesta" aria-labelledby="t-orquesta">
+    <div class="orquesta__cabeza">
+      <h2 class="titulo-seccion" id="t-orquesta">Orquesta en vivo <span class="orquesta__resumen" id="resumen-animales"></span></h2>
+      <span class="orquesta__ayuda">partitura de los últimos 20 s · ahora a la derecha</span>
+    </div>
+    <div class="orquesta__filas" id="filas"></div>
+  </section>
+
+  <aside class="en-vivo__lado">
+    <section class="bloque" aria-labelledby="t-juego">
+      <h2 class="titulo-seccion" id="t-juego">Juego</h2>
+      <div class="modos" id="modos" role="radiogroup" aria-labelledby="t-juego"></div>
+      <div class="campo">
+        <label for="cancion">Canción</label>
+        <select class="selector" id="cancion"></select>
+      </div>
+    </section>
+
+    <section class="bloque" aria-labelledby="t-conexion">
+      <h2 class="titulo-seccion" id="t-conexion">Conexión</h2>
+      <p class="solo-lector" id="conexion-aviso" aria-live="polite"></p>
+      <div id="conexion"></div>
+    </section>
+  </aside>
+</div>
+
+<section class="bloque" aria-labelledby="t-panel">
+  <h2 class="titulo-seccion" id="t-panel">Panel DJ del osito</h2>
+  <div id="panel"></div>
+</section>
+
+<section class="bloque" aria-labelledby="t-resumen">
+  <h2 class="titulo-seccion" id="t-resumen">Resumen de la sesión</h2>
+  <div class="resumen" id="resumen"></div>
+</section>
+
+</div>
+
+<dialog class="ventana" id="ventana-terminar" aria-labelledby="t-terminar">
+  <form class="ventana__contenido" method="dialog" id="form-terminar">
+    <h2 class="ventana__titulo" id="t-terminar">¿Terminar la sesión?</h2>
+    <p>Se guardará en el historial. La música del osito sigue sonando.</p>
+    <div class="ventana__datos" id="terminar-datos"></div>
+    <div class="campo">
+      <label for="nota">Nota para la próxima sesión (opcional)</label>
+      <textarea class="entrada" id="nota" rows="2"></textarea>
+    </div>
+    <p class="ventana__error" id="terminar-error" hidden></p>
+    <div class="ventana__acciones">
+      <button class="boton" type="submit" value="seguir">Seguir en la sesión</button>
+      <button class="boton boton--principal" type="submit" value="terminar">Terminar y guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="js/en-vivo.js"></script>
+</body>
+</html>

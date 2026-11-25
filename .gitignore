@@ -1,6 +1,7 @@
 .secrets/
 *.env
 broker/passwd
+broker/mosquitto.db
 
 certs/*.key
 certs/*.srl
@@ -15,3 +16,5 @@ __pycache__/
 
 firmware/libraries/*
 !firmware/libraries/OrquestaComun/
+
+nodered/.datos/

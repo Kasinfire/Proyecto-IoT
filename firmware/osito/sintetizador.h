@@ -1,6 +1,5 @@
-// Lo único que el director musical sabe del audio. Cada ruta (DAC + PAM8403, serial a la
-// laptop o SAM2695) será otra implementación de esta clase, sin tocar la lógica de los modos.
-// Mientras no se confirme una ruta, el osito usa SintetizadorRegistro (solo imprime).
+// Lo único que el director musical sabe del audio. El equipo eligió sonar por la laptop
+// (SintetizadorRegistro); otra ruta sería otra implementación, sin tocar los modos.
 #pragma once
 
 #include <cstdint>

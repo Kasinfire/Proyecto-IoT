@@ -7,10 +7,12 @@
 #include <cstdlib>
 #include <cstring>
 
+#include "acciones_dj.h"
 #include "animales.h"
 #include "config.h"
 #include "contrato_mqtt.h"
 #include "entradas.h"
+#include "teclado_dj.h"
 
 namespace simulacion {
 namespace {
@@ -31,6 +33,7 @@ void ayuda() {
   Serial.println("  sim pollito agitar <0-100>");
   Serial.println("  sim vivo <ranita|gatito|pollito|todos> <on|off>   (latido cada 1 s)");
   Serial.println("  sim boton                                          (botón de modo)");
+  Serial.println("  sim tecla <1-9|0|A-D|*|#> [largo]                  (teclado DJ; largo: D mantenida)");
   Serial.println("  sim mqtt <on|off>                                  (broker simulado)");
   Serial.println("  sim mqtt modo {\"id\":1,\"modo\":\"libre\"}            (pedido de Node-RED)");
   Serial.println("  sim mqtt ack <hasta_seq>                           (acuse de Node-RED)");
@@ -173,6 +176,12 @@ void ejecutar() {
   } else if (palabras[1] != nullptr && strcmp(palabras[1], "boton") == 0) {
     Serial.println("[SIMULACIÓN] botón de modo presionado");
     entradas::simularPresionModo();
+  } else if (palabras[1] != nullptr && strcmp(palabras[1], "tecla") == 0 && palabras[2] != nullptr &&
+             palabras[2][1] == '\0') {
+    Serial.printf("[SIMULACIÓN] tecla DJ %c\n", palabras[2][0]);
+    const bool largo = palabras[2][0] == 'D' && palabras[3] != nullptr &&
+                       strcmp(palabras[3], "largo") == 0;
+    teclado_dj::simularTecla(largo ? acciones_dj::TECLA_D_LARGA : palabras[2][0]);
   } else {
     comandoAnimal(palabras[1], palabras[2], palabras[3], palabras[4]);
   }
@@ -181,6 +190,7 @@ void ejecutar() {
 
 void iniciar(TransporteSimulado& broker_simulado) {
   broker = &broker_simulado;
+  broker->iniciar(nullptr);  // simulador aislado: nunca alimenta nube ni publica en MQTTS real
   Serial.println("[SIMULACIÓN] Escribe \"ayuda\" para inyectar mensajes de prueba");
 }
 

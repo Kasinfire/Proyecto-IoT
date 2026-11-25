@@ -19,5 +19,25 @@ void alCambio(const estado_animales::CambioConexion& cambio);
 
 // Pedidos de orquesta/control/modo. Quien lo aplica responde con responderModo().
 bool sacarPedidoModo(contrato_mqtt::PedidoModo& pedido);
-void responderModo(int32_t id, bool ok, protocolo::Modo modo);
+// simulado: el pedido llegó por "sim mqtt"; su acuse solo se imprime.
+void responderModo(int32_t id, bool ok, protocolo::Modo modo, bool simulado);
+// Eventos del propio osito, por la cola con acuse. simulado: nació de "sim ..." y no va al
+// broker real.
+void alModo(protocolo::Modo modo, const char* cancion, contrato_mqtt::Origen origen,
+            bool simulado);
+// resultado = Resultado::Nada para el pedido; luego otro con el resultado.
+void alSimon(protocolo::Nodo pedido, simon::Resultado resultado, uint8_t nivel, bool simulado);
+// Volumen del potenciómetro (retenido, a lo más cada VOLUMEN_CADA_MS).
+void alVolumen(uint8_t valor);
+// Pedido de orquesta/control/aviso: true una sola vez por pedido.
+bool sacarAviso(bool& silenciar);
+// Canción de la página, por trozos. Quien la arma responde al final (o si algo falló).
+bool sacarTrozoCancion(contrato_mqtt::TrozoCancion& trozo);
+void responderCancion(int32_t carga, bool ok);
+// Panel DJ.
+bool sacarTeclaRemota(char& tecla);
+void alTecla(char tecla);
+void alPanel(const char* json);  // se publica si cambió
+// Para "sim mqtt modo/ack": entra como si viniera del broker, marcado como SIMULACIÓN.
+void inyectarSimulado(const char* topico, const char* payload);
 }  // namespace nube
