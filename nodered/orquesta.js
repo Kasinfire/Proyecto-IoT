@@ -32,6 +32,9 @@ const MINIMO_JUNTOS = 3;
 const ESPERA_HUECO_MS = 25000;
 const ESPERA_COLA_MS = 5000;
 const RECIBIDOS_MAX = 512;
+// Arranques del osito de los que se recuerda qué llegó. Tras un reinicio, el osito manda primero lo
+// que guardó en LittleFS (con el arranque viejo) y luego lo nuevo: hacen falta al menos dos.
+const ARRANQUES_MAX = 4;
 const DIAS = { mes: 31, trimestre: 92, todo: Infinity };
 
 // { seq, data } -> evento. Lanza un error si la clave, el tópico o el seq no son los que se cifraron.
@@ -79,7 +82,7 @@ class Orquesta {
     // Lo que se conserva al reiniciar Node-RED.
     this.datos = {
       ninos: [], sesiones: [], sesion: null, siguienteId: 1, avisoSilenciado: false,
-      modo: 'cancion', cancion: INCLUIDAS[0].id, canciones: [], siguienteCarga: 1, sync: { arranque: null, hasta: 0, recibidos: [] },
+      modo: 'cancion', cancion: INCLUIDAS[0].id, canciones: [], siguienteCarga: 1, sync: {}, // sync: { [arranque]: { hasta, recibidos, visto } }
     };
     this.conectado = {};
     this.desconectadoDesde = {};
@@ -90,7 +93,7 @@ class Orquesta {
     this.ositoEnLinea = null;
     this.pendientes = 0;
     this.volvioEn = null; // reconectado, falta que diga cuántos eventos traía
-    this.huecoDesde = null;
+    this.huecoDesde = {}; // arranque -> desde cuándo falta un seq
     this.pedidos = new Map(); // id -> canción pedida
     this.carga = null; // canción que se le está mandando al osito
     this.cancionCambiada = false; // se editó la que está sonando
@@ -103,6 +106,15 @@ class Orquesta {
   cargar() {
     const leido = this.almacen.leer();
     if (leido) Object.assign(this.datos, leido);
+    // Antes había un solo arranque: { arranque, hasta, recibidos }.
+    const viejo = this.datos.sync;
+    if (!viejo || typeof viejo !== 'object') {
+      this.datos.sync = {};
+    } else if ('hasta' in viejo) {
+      this.datos.sync = viejo.arranque == null
+        ? {}
+        : { [viejo.arranque]: { hasta: viejo.hasta, recibidos: viejo.recibidos ?? [], visto: 0 } };
+    }
     // Antes se guardaba el nombre tal cual lo mandaba el osito; ahora es el id.
     if (!this.buscarCancion(this.datos.cancion) && this.datos.cancion !== CANCION_DIAGNOSTICO) {
       this.datos.cancion = INCLUIDAS[0].id;
@@ -345,40 +357,55 @@ class Orquesta {
       this.aviso(`Evento rechazado de ${nodo}: ${error.message}`); // alterado, o la clave no es la misma
       return;
     }
-    const sync = this.datos.sync;
-    if (sync.arranque !== (evento.arranque ?? 0)) {
-      // El osito se reinició: sus seq empiezan otra vez.
-      this.datos.sync = { arranque: evento.arranque ?? 0, hasta: evento.seq - 1, recibidos: [] };
-      this.huecoDesde = null;
-    }
-    const s = this.datos.sync;
+    // Cada encendido del osito tiene su arranque y sus seq empiezan en 1. Los eventos que el osito
+    // guardó antes de reiniciarse llegan con el arranque viejo, así que se lleva la cuenta por arranque.
+    const arranque = String(evento.arranque ?? 0);
+    const s = this.syncDe(arranque, evento.seq);
     if (evento.seq > s.hasta && !s.recibidos.includes(evento.seq)) {
       s.recibidos.push(evento.seq);
       if (s.recibidos.length > RECIBIDOS_MAX) s.recibidos.shift();
       this.alEvento(evento, salida);
     }
-    this.avanzar();
+    this.avanzar(arranque);
     // Primero se guarda y después se confirma: si Node-RED se apaga en medio, el osito lo repite.
     this.guardar();
-    this.confirmar(salida);
+    this.confirmar(arranque, salida);
+  }
+
+  // El primer seq que se ve de un arranque nuevo marca dónde empieza.
+  syncDe(arranque, seq) {
+    const sync = this.datos.sync;
+    if (!sync[arranque]) {
+      sync[arranque] = { hasta: seq - 1, recibidos: [], visto: 0 };
+      const claves = Object.keys(sync);
+      if (claves.length > ARRANQUES_MAX) {
+        const olvidar = claves.filter((k) => k !== arranque).sort((a, b) => sync[a].visto - sync[b].visto)[0];
+        delete sync[olvidar];
+        delete this.huecoDesde[olvidar];
+      }
+    }
+    sync[arranque].visto = this.ahora();
+    return sync[arranque];
   }
 
   // Mueve `hasta` mientras no falte ningún seq.
-  avanzar() {
-    const s = this.datos.sync;
+  avanzar(arranque) {
+    const s = this.datos.sync[arranque];
     const quitar = new Set();
     while (s.recibidos.includes(s.hasta + 1)) {
       s.hasta += 1;
       quitar.add(s.hasta);
     }
     s.recibidos = s.recibidos.filter((n) => !quitar.has(n) && n > s.hasta);
-    if (s.recibidos.length === 0) this.huecoDesde = null;
-    else if (this.huecoDesde === null || quitar.size) this.huecoDesde = this.ahora();
+    if (s.recibidos.length === 0) delete this.huecoDesde[arranque];
+    else if (!(arranque in this.huecoDesde) || quitar.size) this.huecoDesde[arranque] = this.ahora();
   }
 
-  confirmar(salida) {
-    if (this.datos.sync.hasta > 0) {
-      salida.mqtt.push({ topic: 'orquesta/sync/ack', payload: JSON.stringify({ hasta_seq: this.datos.sync.hasta }) });
+  // El acuse dice de qué arranque es: así el osito no borra un evento nuevo con el mismo seq que uno viejo.
+  confirmar(arranque, salida) {
+    const { hasta } = this.datos.sync[arranque];
+    if (hasta > 0) {
+      salida.mqtt.push({ topic: 'orquesta/sync/ack', payload: JSON.stringify({ arranque: Number(arranque), hasta_seq: hasta }) });
     }
   }
 
@@ -464,14 +491,15 @@ class Orquesta {
       this.grabacion.llena = true; // la pantalla la termina
       salida.ws.push({ tipo: 'grabacion', activa: false, notas: this.grabacion.toques.length });
     }
-    if (this.huecoDesde !== null && t - this.huecoDesde >= ESPERA_HUECO_MS) {
-      const s = this.datos.sync;
+    for (const [arranque, desde] of Object.entries(this.huecoDesde)) {
+      if (t - desde < ESPERA_HUECO_MS) continue;
+      const s = this.datos.sync[arranque];
       const sigue = Math.min(...s.recibidos);
-      this.aviso(`El osito ya no tiene los eventos ${s.hasta + 1} a ${sigue - 1}`);
+      this.aviso(`El osito ya no tiene los eventos ${s.hasta + 1} a ${sigue - 1} (arranque ${arranque})`);
       s.hasta = sigue - 1;
-      this.avanzar();
+      this.avanzar(arranque);
       this.guardar();
-      this.confirmar(salida);
+      this.confirmar(arranque, salida);
     }
     return salida;
   }

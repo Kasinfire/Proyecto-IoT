@@ -96,5 +96,6 @@ bool leerPedidoModo(const char* json, PedidoModo& pedido);
 bool armarAckModo(int32_t id, bool ok, protocolo::Modo modo, char* destino, size_t tamano);
 
 // {"hasta_seq":<n>}
-bool leerSyncAck(const char* json, uint32_t& hasta_seq);
+// {"arranque":A,"hasta_seq":N}. Un acuse viejo sin arranque deja trae_arranque en false.
+bool leerSyncAck(const char* json, uint32_t& hasta_seq, uint32_t& arranque, bool& trae_arranque);
 }  // namespace contrato_mqtt

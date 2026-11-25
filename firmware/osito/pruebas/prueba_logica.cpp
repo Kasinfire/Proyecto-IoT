@@ -1219,10 +1219,17 @@ void pruebasContratoMqtt() {
   revisar("mqtt: ack {\"id\":7,\"ok\":true,\"modo\":\"cancion\"}",
           strcmp(texto, "{\"id\":7,\"ok\":true,\"modo\":\"cancion\"}") == 0);
   uint32_t hasta = 0;
-  revisar("mqtt: lee sync ack hasta_seq",
-          contrato_mqtt::leerSyncAck("{\"hasta_seq\":42}", hasta) && hasta == 42);
+  uint32_t de_arranque = 0;
+  bool trae_arranque = true;
+  revisar("mqtt: sync ack viejo, sin arranque",
+          contrato_mqtt::leerSyncAck("{\"hasta_seq\":42}", hasta, de_arranque, trae_arranque) &&
+              hasta == 42 && !trae_arranque);
+  revisar("mqtt: sync ack con arranque",
+          contrato_mqtt::leerSyncAck("{\"arranque\":123456,\"hasta_seq\":7}", hasta, de_arranque,
+                                     trae_arranque) &&
+              hasta == 7 && trae_arranque && de_arranque == 123456);
   revisar("mqtt: sync ack negativo -> invalido",
-          !contrato_mqtt::leerSyncAck("{\"hasta_seq\":-1}", hasta));
+          !contrato_mqtt::leerSyncAck("{\"hasta_seq\":-1}", hasta, de_arranque, trae_arranque));
   // Mensajes nuevos para la interfaz web (nodered/README.md del PR #13).
   char buf[config::EVENTO_JSON_MAX];
   revisar("mqtt: evento de modo del osito con origen",
@@ -1263,42 +1270,131 @@ void pruebasContratoMqtt() {
   revisar("mqtt: aviso sin el campo se ignora", !contrato_mqtt::leerAviso("{}", silenciar));
 }
 
-void pruebasColaEventos() {
-  cola_eventos::reiniciar();
-  for (int i = 0; i < 5; ++i) {
-    cola_eventos::agregar(cola_eventos::reservarSeq(), 2, "{}");
+// Desborde en memoria, en lugar de LittleFS.
+class DesbordeFalso : public cola_eventos::Desborde {
+ public:
+  explicit DesbordeFalso(size_t capacidad) : capacidad_(capacidad) {}
+  bool meter(const cola_eventos::Registro& r) override {
+    if (n_ - leidos_ >= capacidad_) return false;
+    registros_[n_++] = r;
+    return true;
   }
-  revisar("cola: 5 eventos pendientes", cola_eventos::pendientes() == 5);
-  revisar("cola: un acuse antes de publicar no borra nada",
-          cola_eventos::confirmarHasta(5) == 0 && cola_eventos::pendientes() == 5);
+  bool sacar(cola_eventos::Registro& r) override {
+    if (leidos_ == n_) return false;
+    r = registros_[leidos_++];
+    return true;
+  }
+  size_t cantidad() const override { return n_ - leidos_; }
 
+ private:
+  cola_eventos::Registro registros_[256] = {};
+  size_t capacidad_;
+  size_t n_ = 0;
+  size_t leidos_ = 0;
+};
+
+// Publica los primeros `cuantos` sin publicar.
+void publicar(size_t cuantos) {
+  uint32_t a = 0;
   uint32_t seq = 0;
   uint8_t nodo = 0;
   const char* json = nullptr;
-  for (int i = 0; i < 3 && cola_eventos::siguientePorPublicar(seq, nodo, json); ++i) {
-    cola_eventos::marcarPublicado(seq);  // se publican 1, 2 y 3
+  for (size_t i = 0; i < cuantos && cola_eventos::siguientePorPublicar(a, seq, nodo, json); ++i) {
+    cola_eventos::marcarPublicado(a, seq);
   }
+}
+
+void pruebasColaEventos() {
+  constexpr uint32_t A = 7;
+  cola_eventos::usarDesborde(nullptr);
+  cola_eventos::reiniciar();
+  for (int i = 0; i < 5; ++i) {
+    cola_eventos::agregar(A, cola_eventos::reservarSeq(), 2, "{}");
+  }
+  revisar("cola: 5 eventos pendientes", cola_eventos::pendientes() == 5);
+  revisar("cola: un acuse antes de publicar no borra nada",
+          cola_eventos::confirmarHasta(A, 5) == 0 && cola_eventos::pendientes() == 5);
+
+  uint32_t a = 0;
+  uint32_t seq = 0;
+  uint8_t nodo = 0;
+  const char* json = nullptr;
+  publicar(3);  // se publican 1, 2 y 3
   revisar("cola: publicar no borra (falta el acuse)", cola_eventos::pendientes() == 5);
-  revisar("cola: acuse hasta 2 borra 1 y 2", cola_eventos::confirmarHasta(2) == 2 &&
+  revisar("cola: acuse de otro arranque no borra nada",
+          cola_eventos::confirmarHasta(A + 1, 5) == 0 && cola_eventos::pendientes() == 5);
+  revisar("cola: acuse hasta 2 borra 1 y 2", cola_eventos::confirmarHasta(A, 2) == 2 &&
                                                  cola_eventos::pendientes() == 3);
   revisar("cola: acuse hasta 5 solo borra lo publicado (el 3)",
-          cola_eventos::confirmarHasta(5) == 1 && cola_eventos::pendientes() == 2);
+          cola_eventos::confirmarHasta(A, 5) == 1 && cola_eventos::pendientes() == 2);
   revisar("cola: sigue el 4, en orden",
-          cola_eventos::siguientePorPublicar(seq, nodo, json) && seq == 4 && nodo == 2);
+          cola_eventos::siguientePorPublicar(a, seq, nodo, json) && seq == 4 && nodo == 2 && a == A);
 
-  cola_eventos::marcarPublicado(4);
+  cola_eventos::marcarPublicado(A, 4);
   cola_eventos::republicarTodo();
   revisar("cola: al reconectar se republica desde el mas viejo",
-          cola_eventos::siguientePorPublicar(seq, nodo, json) && seq == 4);
+          cola_eventos::siguientePorPublicar(a, seq, nodo, json) && seq == 4);
 
   cola_eventos::reiniciar();
   for (size_t i = 0; i < config::CAPACIDAD_COLA_MQTT + 3; ++i) {
-    cola_eventos::agregar(cola_eventos::reservarSeq(), 1, "{}");
+    cola_eventos::agregar(A, cola_eventos::reservarSeq(), 1, "{}");
   }
-  revisar("cola: llena -> descarta los 3 mas viejos",
+  revisar("cola: llena y sin desborde -> descarta los 3 mas viejos",
           cola_eventos::descartados() == 3 &&
               cola_eventos::pendientes() == config::CAPACIDAD_COLA_MQTT &&
-              cola_eventos::siguientePorPublicar(seq, nodo, json) && seq == 4);
+              cola_eventos::siguientePorPublicar(a, seq, nodo, json) && seq == 4);
+
+  // Reinicio del osito: se exporta la RAM y se importa con otro arranque ya en uso.
+  cola_eventos::reiniciar();
+  cola_eventos::agregar(A, cola_eventos::reservarSeq(), 2, "{\"seq\":1}");
+  cola_eventos::agregar(A, cola_eventos::reservarSeq(), 3, "{\"seq\":2}");
+  static uint8_t copia[cola_eventos::EXPORTAR_MAX];
+  const size_t bytes = cola_eventos::exportar(copia, sizeof(copia));
+  revisar("cola: exporta la RAM", bytes > 8);
+  revisar("cola: un archivo cortado no se importa",
+          !cola_eventos::importar(copia, bytes - 1) && cola_eventos::pendientes() == 2);
+  cola_eventos::reiniciar();
+  revisar("cola: importa lo de antes del reinicio",
+          cola_eventos::importar(copia, bytes) && cola_eventos::pendientes() == 2 &&
+              cola_eventos::contieneArranque(A) && !cola_eventos::contieneArranque(A + 1));
+  revisar("cola: lo importado conserva arranque, seq, nodo y JSON",
+          cola_eventos::siguientePorPublicar(a, seq, nodo, json) && a == A && seq == 1 &&
+              nodo == 2 && strcmp(json, "{\"seq\":1}") == 0);
+  constexpr uint32_t B = 8;
+  cola_eventos::agregar(B, cola_eventos::reservarSeq(), 2, "{}");  // seq 1 del arranque nuevo
+  publicar(3);
+  revisar("cola: el seq 1 de cada arranque es distinto al confirmar",
+          cola_eventos::confirmarHasta(B, 1) == 1 && cola_eventos::pendientes() == 2 &&
+              cola_eventos::frente(a, seq) && a == A && seq == 1);
+  revisar("cola: luego se confirma lo viejo",
+          cola_eventos::confirmarHasta(A, 2) == 2 && cola_eventos::pendientes() == 0);
+
+  // Sin red mucho tiempo: lo que no cabe va al desborde y vuelve en orden.
+  DesbordeFalso desborde(10);
+  cola_eventos::reiniciar();
+  cola_eventos::usarDesborde(&desborde);
+  for (size_t i = 0; i < config::CAPACIDAD_COLA_MQTT + 12; ++i) {
+    cola_eventos::agregar(A, cola_eventos::reservarSeq(), 1, "{}");
+  }
+  revisar("cola: lo que no cabe va al desborde (y si se llena, se cuenta)",
+          cola_eventos::enRam() == config::CAPACIDAD_COLA_MQTT && desborde.cantidad() == 10 &&
+              cola_eventos::descartados() == 2 &&
+              cola_eventos::pendientes() == config::CAPACIDAD_COLA_MQTT + 10);
+  publicar(config::CAPACIDAD_COLA_MQTT);
+  revisar("cola: al confirmar, el desborde vuelve a la RAM",
+          cola_eventos::confirmarHasta(A, 5) == 5 && desborde.cantidad() == 5);
+  bool en_orden = true;
+  uint32_t esperado = 6;
+  while (cola_eventos::pendientes() > 0) {
+    publicar(config::CAPACIDAD_COLA_MQTT);
+    uint32_t primero = 0;
+    cola_eventos::frente(a, primero);
+    en_orden = en_orden && primero == esperado;
+    cola_eventos::confirmarHasta(A, primero);
+    ++esperado;
+  }
+  revisar("cola: todo sale en orden, sin huecos (1 a 74)", en_orden && esperado == 75);
+  cola_eventos::usarDesborde(nullptr);
 }
 }  // namespace
 

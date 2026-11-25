@@ -295,13 +295,16 @@ bool armarAckModo(int32_t id, bool ok, protocolo::Modo modo, char* destino, size
               tamano);
 }
 
-bool leerSyncAck(const char* json, uint32_t& hasta_seq) {
+bool leerSyncAck(const char* json, uint32_t& hasta_seq, uint32_t& arranque, bool& trae_arranque) {
   long long valor = 0;
   if (json == nullptr || !leerEntero(json, "hasta_seq", valor) || valor < 0 ||
       valor > UINT32_MAX) {
     return false;
   }
   hasta_seq = static_cast<uint32_t>(valor);
+  long long a = 0;
+  trae_arranque = leerEntero(json, "arranque", a) && a >= 0 && a <= UINT32_MAX;
+  arranque = trae_arranque ? static_cast<uint32_t>(a) : 0;
   return true;
 }
 }  // namespace contrato_mqtt

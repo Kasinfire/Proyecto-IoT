@@ -140,7 +140,7 @@ Cliente: PubSubClient sobre WiFiClientSecure (igual que Práctica 4). PubSubClie
 | `orquesta/{nodo}/estado` | osito → broker | online/offline, RSSI. Retained. LWT `OFFLINE` para el osito; el osito publica el estado de cada animal según su heartbeat ESP-NOW | Pub/Sub |
 | `orquesta/control/modo` | Node-RED → osito | `{"id":<n>,"modo":"cancion|libre|simon","cancion":"estrellita"}` | Request |
 | `orquesta/control/modo/ack` | osito → Node-RED | `{"id":<n>,"ok":true,"modo":"cancion"}` | Response |
-| `orquesta/sync/ack` | Node-RED → osito | `{"hasta_seq":<n>}` confirma eventos recibidos para borrarlos del buffer | Response |
+| `orquesta/sync/ack` | Node-RED → osito | `{"arranque":<a>,"hasta_seq":<n>}` confirma eventos recibidos para borrarlos del buffer | Response |
 | `orquesta/sesion/resumen` | Node-RED → Node-RED (flujo que lo guarda en Supabase) | Resumen de sesión | Pub/Sub |
 
 Payload de evento (texto plano antes de cifrar):
@@ -186,9 +186,9 @@ Nuevo en este proyecto:
 ## 8. Resiliencia (Unidad 5)
 
 - Si se cae el Wi-Fi o el broker, **la música sigue sonando** (todo es local en el osito y la laptop).
-- El osito guarda los eventos en **LittleFS** (archivo de líneas JSON con `seq` y timestamp NTP) mientras no hay conexión.
-- Al reconectar, reenvía en orden. Node-RED responde `orquesta/sync/ack` con el último `seq` recibido y el osito borra hasta ahí. Node-RED descarta duplicados por `seq`.
-- Limitar el tamaño del buffer (por ejemplo, descartar lo más viejo si se llena) y documentar ese límite.
+- El osito guarda los eventos sin confirmar: 64 en RAM y el resto en **LittleFS** (`/desborde.bin`, hasta 4000, ~30 min sin red). Mientras no hay red copia la RAM a `/cola.bin`, así que un reinicio tampoco los pierde (detalle en `firmware/osito/README.md`).
+- Al reconectar, reenvía en orden. Node-RED responde `orquesta/sync/ack` con el arranque y el último `seq` recibido sin huecos; el osito borra hasta ahí. Node-RED descarta duplicados por `(arranque, seq)`.
+- Límites documentados: si el desborde se llena, se descarta el evento nuevo y se cuenta; si se va la luz, se pierde como mucho el último segundo (o los últimos 3 s si había red).
 - Segundo nivel (laptop → Supabase): si se cae el internet de la laptop, Node-RED guarda lo pendiente (por ejemplo, en un archivo) y reintenta cada cierto tiempo hasta que Supabase confirme. Sin esto, se perderían los datos de ese tramo.
 - Nota: los proyectos gratuitos de Supabase se pausan tras varios días sin uso; abrirlo antes de la demo.
 
