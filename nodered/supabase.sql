@@ -26,3 +26,8 @@ create index if not exists sesiones_alias_inicio on public.sesiones (alias, inic
 -- escribir nada. Node-RED usa la llave secreta, que solo vive en .secrets/mqtt.env de la laptop.
 alter table public.ninos enable row level security;
 alter table public.sesiones enable row level security;
+
+-- Permisos explícitos: algunos proyectos no se los dan solos a la llave secreta (error 42501).
+-- Nunca darle esto a anon ni a authenticated.
+grant usage on schema public to service_role;
+grant select, insert, update, delete on public.ninos, public.sesiones to service_role;
