@@ -1,8 +1,11 @@
 // Al arrancar toma la luz del cuarto como "destapada" en lugar de usar un umbral
-// fijo, así funciona igual en el salón que en casa.
+// fijo, así funciona igual en el salón que en casa. Después la sigue ajustando sola
+// (calibracion_luz.h) por si cambian las luces o se encendió tapada.
 #include <Arduino.h>
+#include <promedio_movil.h>
 #include <protocolo.h>
 
+#include "calibracion_luz.h"
 #include "config.h"
 #include "pines.h"
 #include "sensor_sombra.h"
@@ -16,6 +19,10 @@ uint32_t inicio_calibracion_ms = 0;
 uint32_t suma_calibracion = 0;
 uint32_t lecturas_calibracion = 0;
 uint16_t luz_ambiente = 0;
+CalibracionLuz calibracion;
+PromedioMovil<config::PROMEDIO_LECTURAS> promedio;
+uint16_t ultima_luz = 0;
+uint32_t ultima_impresion_ms = 0;
 
 uint32_t ultima_lectura_ms = 0;
 uint8_t nivel_actual = 0;
@@ -37,8 +44,9 @@ uint8_t calcularNivel(uint16_t luz) {
   return nivel < config::ZONA_MUERTA_NIVEL ? 0 : static_cast<uint8_t>(nivel);
 }
 
-void terminarCalibracion() {
+void terminarCalibracion(uint32_t ahora_ms) {
   luz_ambiente = suma_calibracion / lecturas_calibracion;
+  calibracion.empezar(luz_ambiente, ahora_ms);
   estado = Estado::Listo;
   Serial.printf("[sombra] Calibrada. Luz ambiente = %u\n", luz_ambiente);
   if (luz_ambiente < config::LUZ_AMBIENTE_MIN) {
@@ -75,20 +83,36 @@ void actualizar() {
     return;
   }
   ultima_lectura_ms = ahora_ms;
-  const uint16_t luz = analogRead(pines::LDR);  // 0 = oscuro, 4095 = mucha luz
+  const uint16_t luz = promedio.agregar(analogRead(pines::LDR));  // 0 = oscuro, 4095 = mucha luz
+  ultima_luz = luz;
 
   switch (estado) {
     case Estado::Calibrando:
       suma_calibracion += luz;
       ++lecturas_calibracion;
       if (ahora_ms - inicio_calibracion_ms >= config::CALIBRACION_MS) {
-        terminarCalibracion();
+        terminarCalibracion(ahora_ms);
       }
       break;
 
     case Estado::Listo:
       nivel_actual = calcularNivel(luz);
+      if (calibracion.actualizar(luz, nivel_actual == 0, ahora_ms)) {
+        Serial.printf("[sombra] La luz se quedó fija en %u por %lu s: ahora esa es la normal\n", luz,
+                      static_cast<unsigned long>(config::CALIBRA_TAPADA_FIJA_MS / 1000));
+      }
+      luz_ambiente = calibracion.normal();
+      if (luz_ambiente == 0) {
+        luz_ambiente = 1;  // calcularNivel necesita una luz normal mayor que 0
+      }
+      nivel_actual = calcularNivel(luz);
       revisarCambio(ahora_ms);
+      if (config::IMPRIMIR_LUZ_CADA_MS > 0 &&
+          ahora_ms - ultima_impresion_ms >= config::IMPRIMIR_LUZ_CADA_MS) {
+        ultima_impresion_ms = ahora_ms;
+        Serial.printf("[sombra] luz=%u normal=%u nivel=%u\n", ultima_luz, luz_ambiente,
+                      nivel_actual);
+      }
       break;
   }
 }
