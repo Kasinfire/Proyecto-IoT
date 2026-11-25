@@ -379,7 +379,7 @@ class Orquesta {
     // Cada encendido del osito tiene su arranque y sus seq empiezan en 1. Los eventos que el osito
     // guardó antes de reiniciarse llegan con el arranque viejo, así que se lleva la cuenta por arranque.
     const arranque = String(evento.arranque ?? 0);
-    const s = this.syncDe(arranque, evento.seq);
+    const s = this.syncDe(arranque);
     if (evento.seq > s.hasta && !s.recibidos.includes(evento.seq)) {
       s.recibidos.push(evento.seq);
       if (s.recibidos.length > RECIBIDOS_MAX) s.recibidos.shift();
@@ -391,11 +391,12 @@ class Orquesta {
     this.confirmar(arranque, salida);
   }
 
-  // El primer seq que se ve de un arranque nuevo marca dónde empieza.
-  syncDe(arranque, seq) {
+  // Los seq empiezan en 1: si el primero que llega es mayor, los de antes se perdieron en el camino y
+  // el osito los repite. Si ya no los tiene, se siguen tras ESPERA_HUECO_MS.
+  syncDe(arranque) {
     const sync = this.datos.sync;
     if (!sync[arranque]) {
-      sync[arranque] = { hasta: seq - 1, recibidos: [], visto: 0 };
+      sync[arranque] = { hasta: 0, recibidos: [], visto: 0 };
       const claves = Object.keys(sync);
       if (claves.length > ARRANQUES_MAX) {
         const olvidar = claves.filter((k) => k !== arranque).sort((a, b) => sync[a].visto - sync[b].visto)[0];
@@ -738,7 +739,8 @@ class Orquesta {
         else if (r.op.alias === op.de) r.op.alias = op.a;
       }
     }
-    if (!this.nube) return;
+    // Si alguna vez hubo nube se anota aunque ahora esté apagada: allá hay datos que borrar o cambiar.
+    if (!this.nube && !this.datos.nubeAlDia) return;
     if (op.op === 'sesion') {
       const [limpia] = paraNube({ ninos: [], sesiones: [op.sesion], canciones: [] }).sesiones;
       op = { op: 'sesion', sesion: limpia };

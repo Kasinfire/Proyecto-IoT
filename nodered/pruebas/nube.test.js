@@ -173,6 +173,25 @@ test('lo pendiente sobrevive a reiniciar Node-RED, y lo de antes de Supabase se 
   assert.strictEqual(b.o.datos.paraLaNube.length, 0);
 });
 
+test('lo que se borra o cambia con Supabase apagado se sube al volver a encenderlo', async () => {
+  const archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'orq-')), 'o.json');
+  const a = nueva({ archivo });
+  sesionCompleta(a.o, 'A-07');
+  a.o.alHttp('POST', 'ninos', { alias: 'B-01' });
+  await a.o.sincronizarNube();
+  // Se quita la llave y se sigue usando.
+  const sinNube = new Orquesta({ claveHex: CLAVE, archivo });
+  sinNube.alHttp('POST', 'ninos/borrar', { alias: 'A-07' });
+  sinNube.alHttp('POST', 'ninos/editar', { alias: 'B-01', nuevo_alias: 'B-02', nombre: '' });
+  assert.strictEqual((await sinNube.sincronizarNube()).ws.length, 0);
+  const b = nueva({ archivo });
+  await b.o.sincronizarNube();
+  assert.deepStrictEqual(b.falso.peticiones.map((p) => `${p.metodo} ${p.url.split('/v1/')[1]}`), [
+    'DELETE ninos?alias=eq.A-07', 'PATCH ninos?alias=eq.B-01', 'POST ninos?on_conflict=alias',
+  ]);
+  assert.strictEqual(b.o.datos.paraLaNube.length, 0);
+});
+
 test('sin Supabase configurado no se encola nada', async () => {
   const o = new Orquesta({ claveHex: CLAVE });
   sesionCompleta(o);

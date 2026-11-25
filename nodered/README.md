@@ -36,7 +36,8 @@ de niños (solo alias y avatar) y sesiones (sin la nota del terapeuta):
    llave mal (401/403) o sin las tablas (404) se reintenta cada 10, 20, 40 y luego 60 s. Si falta el
    niño de una sesión (409), se crea. Si Supabase dice que el dato no es válido (otro 4xx), se avisa y
    se aparta en `rechazadasNube`, en esta laptop; se borra si se borra al niño.
-3. La primera vez que Node-RED arranca con Supabase, sube todo lo que ya había en la laptop.
+3. La primera vez que Node-RED arranca con Supabase, sube todo lo que ya había en la laptop. Si
+   después se quita la llave, lo que cambie o se borre se anota y sube al volver a ponerla.
 
 El mensaje `red` lleva `nube_pendientes`. Sin `SUPABASE_URL` y `SUPABASE_KEY` (ver `COMANDOS.md`)
 todo sigue igual, solo en la laptop.
