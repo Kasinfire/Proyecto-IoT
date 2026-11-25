@@ -6,7 +6,7 @@ Node-RED las sirve y les manda los datos. El diseño y su justificación están 
 | Archivo | Pantalla |
 |---|---|
 | `en-vivo.html` | Sesión en vivo: animalitos con su partitura, juego (modo y canción), conexión y resumen |
-| `historial.html` | Avance de cada niño entre sesiones (viene de Supabase a través de Node-RED) |
+| `historial.html` | Avance de cada niño entre sesiones (de Node-RED, que guarda una copia en Supabase) |
 | `canciones.html` | Biblioteca de canciones con filtros (Tranquilas, Alegres, Navidad, Cumpleaños) |
 | `ninos.html` | Niños del consultorio, solo con alias |
 | `proyector.html` | Pantalla del niño, estilo bloques, para el proyector |

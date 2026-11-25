@@ -6,6 +6,7 @@
 #include "acciones_dj.h"
 #include "animales.h"
 #include "canciones.h"
+#include "cola_persistente.h"
 #include "config.h"
 #include "director.h"
 #include "entradas.h"
@@ -232,6 +233,7 @@ void setup() {
   sintetizador.iniciar();
   director::iniciar(sintetizador, esp_random(), millis());
   director::volumen(entradas::volumen());
+  cola_persistente::iniciar();  // antes de la nube: recupera lo que quedó sin confirmar
   nube::iniciar(broker);  // inicia Wi-Fi; ESP-NOW se arranca después de asociarse al router
   broker_simulado.iniciar(nube::inyectarSimulado);
   simulacion::iniciar(broker_simulado);
@@ -321,6 +323,7 @@ void loop() {
   }
 
   nube::actualizar();
+  cola_persistente::actualizar();
   luces::alerta(estado_animales::algunoSeDesconecto(ahora_ms));
   luces::actualizar();
 }

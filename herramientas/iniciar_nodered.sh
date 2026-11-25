@@ -22,6 +22,17 @@ for NOMBRE in NODERED_USER NODERED_PASSWORD MQTT_AES_KEY_HEX; do
   export "$NOMBRE=$VALOR"
 done
 unset VALOR
+# Supabase es opcional: sin estas dos, el historial se queda solo en la laptop.
+for NOMBRE in SUPABASE_URL SUPABASE_KEY; do
+  VALOR="$(leer "$NOMBRE")"
+  if [ -n "$VALOR" ]; then
+    export "$NOMBRE=$VALOR"
+  fi
+done
+unset VALOR
+if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_KEY:-}" ]; then
+  echo "Sin SUPABASE_URL/SUPABASE_KEY en .secrets/mqtt.env: el historial solo se guarda en esta laptop"
+fi
 
 # Node-RED y el broker están en la misma laptop y el certificado incluye 127.0.0.1: así no importa
 # si cambia la IP de la red.

@@ -29,7 +29,7 @@ test('descifra, reparte y confirma', () => {
   const { o } = nueva();
   const r = o.alMqtt(...nota(1));
   assert.deepStrictEqual(r.ws, [{ tipo: 'nota', nodo: 'gatito', nota: 'mi', vel: 100 }]);
-  assert.deepStrictEqual(r.mqtt, [{ topic: 'orquesta/sync/ack', payload: '{"hasta_seq":1}' }]);
+  assert.deepStrictEqual(r.mqtt, [{ topic: 'orquesta/sync/ack', payload: '{"arranque":7,"hasta_seq":1}' }]);
 });
 
 test('rechaza alterado, clave distinta y tópico cambiado, sin confirmar', () => {
@@ -88,6 +88,41 @@ test('al reiniciarse el osito, seq 1 es nuevo', () => {
   const r = o.alMqtt(...nota(1, 100, 8));
   assert.strictEqual(r.ws.length, 1);
   assert.deepStrictEqual(ack(r), [1]);
+});
+
+test('lo que el osito guardó antes de reiniciarse llega con su arranque y no se mezcla', () => {
+  const { o } = nueva();
+  o.alMqtt(...nota(1, 100, 7));
+  // El osito se reinicia con los eventos 2 y 3 del arranque 7 guardados en LittleFS.
+  const nuevo = o.alMqtt(...nota(1, 100, 8));
+  assert.strictEqual(nuevo.ws.length, 1);
+  assert.deepStrictEqual(nuevo.mqtt.map((m) => JSON.parse(m.payload)), [{ arranque: 8, hasta_seq: 1 }]);
+  const viejo = o.alMqtt(...nota(2, 100, 7));
+  assert.strictEqual(viejo.ws.length, 1, 'el 2 del arranque 7 no es el 1 del 8');
+  assert.deepStrictEqual(viejo.mqtt.map((m) => JSON.parse(m.payload)), [{ arranque: 7, hasta_seq: 2 }]);
+  // Repetidos de cualquiera de los dos no cuentan otra vez.
+  assert.strictEqual(o.alMqtt(...nota(1, 100, 7)).ws.length, 0);
+  assert.strictEqual(o.alMqtt(...nota(1, 100, 8)).ws.length, 0);
+  assert.strictEqual(o.alMqtt(...nota(3, 100, 7)).ws.length, 1);
+});
+
+test('un hueco en un arranque no frena al otro', () => {
+  const { o, reloj, avisos } = nueva();
+  o.alMqtt(...nota(1, 100, 7));
+  o.alMqtt(...nota(3, 100, 7)); // falta el 2 del arranque 7
+  assert.deepStrictEqual(ack(o.alMqtt(...nota(1, 100, 8))), [1]);
+  reloj.t += 30000;
+  const r = o.alSegundo();
+  assert.deepStrictEqual(r.mqtt.map((m) => JSON.parse(m.payload)), [{ arranque: 7, hasta_seq: 3 }]);
+  assert.ok(avisos.some((a) => a.includes('arranque 7')));
+});
+
+test('el archivo con el formato viejo de sync se sigue leyendo', () => {
+  const archivo = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'orq-')), 'o.json');
+  fs.writeFileSync(archivo, JSON.stringify({ sync: { arranque: 7, hasta: 5, recibidos: [] } }));
+  const { o } = nueva({ archivo });
+  assert.deepStrictEqual(o.alMqtt(...nota(5, 100, 7)).ws, [], 'el 5 ya estaba confirmado');
+  assert.strictEqual(o.alMqtt(...nota(6, 100, 7)).ws.length, 1);
 });
 
 test('reiniciar Node-RED conserva lo confirmado, niños y sesión', () => {

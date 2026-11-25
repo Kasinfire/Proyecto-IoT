@@ -143,9 +143,15 @@ constexpr uint8_t PANEL_AVANCE_PASO = 5;  // % : el avance solo se manda cada ta
 constexpr size_t TECLAS_REMOTAS_MAX = 8;
 constexpr size_t TROZOS_CANCION_MAX = 24;
 constexpr size_t ENTRANTE_MAX = 256;
-// RAM: 64 x 160 B = 10 KB. Sin Wi-Fi, a ~2 eventos/s alcanza para ~30 s; lo demás se descarta
-// (el más viejo primero) hasta pasar la cola a LittleFS.
+// RAM: 64 x 170 B = 11 KB. Sin Wi-Fi, a ~2 eventos/s alcanza para ~30 s; lo que no cabe se
+// escribe en LittleFS (cola_persistente) y vuelve a la RAM conforme Node-RED confirma.
 constexpr size_t CAPACIDAD_COLA_MQTT = 64;
+// Desborde en LittleFS: 4000 x 172 B = ~690 KB de los ~1.5 MB de la partición; ~30 min sin red.
+constexpr size_t DESBORDE_MAX = 4000;
+// La RAM se copia a LittleFS solo si el evento más viejo lleva este tiempo sin acuse (no hay red),
+// y como mucho una vez por GUARDAR_COLA_CADA_MS. Con red no se escribe en la flash.
+constexpr uint32_t ESPERA_PARA_GUARDAR_COLA_MS = 3000;
+constexpr uint32_t GUARDAR_COLA_CADA_MS = 1000;
 constexpr size_t EVENTO_JSON_MAX = 160;  // modo con una canción larga y el arranque: 157
 constexpr size_t TOPICO_MAX = 40;
 constexpr size_t PUBLICAR_POR_VUELTA = 4;

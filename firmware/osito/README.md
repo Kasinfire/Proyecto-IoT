@@ -50,6 +50,7 @@ que ESP-NOW y la cola sobrevivan a una caída de Wi-Fi o del broker; la ranita e
 | `panel_json`                       | Estado del panel DJ para la página                                      | no                   |
 | `acompanamiento`                   | Banda de fondo: ritmos y acordes                                        | no                   |
 | `contrato_mqtt`, `cola_eventos`    | JSON, tópicos MQTT y cola que espera el acuse                           | no                   |
+| `cola_persistente`                 | Cola en LittleFS: desborde sin red y copia que sobrevive a un reinicio  | sí                   |
 | `nube`, `transporte_*`             | Cola de eventos y MQTTS real (en su propia tarea); simulador aislado    | sí                   |
 
 ## Cableado del osito
@@ -166,11 +167,26 @@ Wi-Fi, NTP, TLS y MQTT corren en una tarea propia (núcleo 0): un broker caído 
 | `orquesta/control/tecla` | `{"tecla":"8"}`: como apretarla; `d` es D mantenida |
 | `orquesta/control/cancion` → `…/cancion/ack` | Canción propia por trozos; solo se puede elegir si llegó completa |
 | `orquesta/control/aviso` | `{"silenciar":true|false}`: calla el sonido de desconexión (el LED sigue) |
-| `orquesta/sync/ack` | `{"hasta_seq":N}`: solo así se borran eventos de la cola |
+| `orquesta/sync/ack` | `{"arranque":A,"hasta_seq":N}`: solo así se borran eventos de la cola (los de ese arranque) |
 
 Los eventos van como `{"seq":N,"data":"<Base64 de nonce || cifrado || tag>"}` con AES-128-GCM
 (`MQTT_AES_KEY_HEX`) y AAD `nodo:seq`. Lo simulado (`sim boton`, `sim tecla`, `sim mqtt …`) nunca
 llega al broker real, y un `sim mqtt ack` no borra la cola real.
+
+## Cola sin red y reinicios
+
+Cada evento lleva `seq` (empieza en 1 en cada encendido) y `arranque` (un número al azar por
+encendido). Solo se borra de la cola cuando Node-RED manda `orquesta/sync/ack` con ese arranque.
+
+- Los primeros 64 eventos pendientes viven en RAM. Lo que no cabe se escribe en orden en
+  `/desborde.bin` (LittleFS, hasta `DESBORDE_MAX` = 4000, unos 30 min a 2 eventos/s) y vuelve a la RAM
+  conforme llegan los acuses. Si también se llena, el evento nuevo se descarta y se cuenta en
+  `orquesta/osito/cola`.
+- Si el evento más viejo lleva 3 s sin acuse (no hay red), la RAM se copia a `/cola.bin` cada segundo.
+  Con red no se escribe en la flash. Al encender, `cola_persistente::iniciar()` recupera la copia
+  y el desborde, y esos eventos salen primero con su arranque viejo.
+- Límite: si se va la luz, se pierde lo que entró a la RAM en el último segundo y lo que tenía
+  menos de 3 s sin acuse.
 
 ## Pendiente de validar
 
@@ -179,6 +195,6 @@ llega al broker real, y un `sim mqtt ack` no borra la cola real.
 - Node-RED: descifrar el sobre `seq`/`data`, mandar `orquesta/sync/ack` y traducir al WebSocket de
   la interfaz web (PR #13).
 - Las melodías incluidas (`nodered/canciones.json` → `canciones_datos.h` con `herramientas/generar_canciones.mjs`) falta oírlas con los animales.
-- `seq` MQTT vuelve a 1 al encender el osito y la cola de 64 eventos vive en RAM; faltan persistencia
-  y un identificador de arranque para hacer la sincronización resistente a reinicios.
+- Probar en la placa `cola_persistente` (no hay `arduino-cli` aquí: compilarlo en el IDE con el
+  esquema de particiones *Default 4MB with spiffs*, que deja ~1.5 MB para LittleFS).
 - El gatito todavía usa `enlace_simulado`; `filtro_boton` podría migrar al `Antirrebote` común.

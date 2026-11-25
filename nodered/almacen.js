@@ -1,5 +1,5 @@
-// Dónde se guardan niños, sesiones y canciones. Hoy, un archivo en esta laptop. Cuando haya Supabase,
-// su versión tendrá los mismos métodos y solo subirá lo que da paraNube() (nunca el nombre del niño).
+// Dónde se guardan niños, sesiones y canciones: un archivo en esta laptop, que es la fuente de verdad.
+// A Supabase (nube.js) solo sube lo que da paraNube(): nunca el nombre del niño ni la nota.
 'use strict';
 
 const fs = require('node:fs');

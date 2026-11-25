@@ -95,10 +95,16 @@ void alMensaje(const char* topico, const char* payload) {
       return;
     }
     uint32_t hasta_seq = 0;
-    if (contrato_mqtt::leerSyncAck(payload, hasta_seq)) {
-      const size_t borrados = cola_eventos::confirmarHasta(hasta_seq);
-      Serial.printf("[nube] Acuse hasta_seq=%lu: borré %u, quedan %u\n",
-                    static_cast<unsigned long>(hasta_seq), static_cast<unsigned>(borrados),
+    uint32_t de_arranque = 0;
+    bool trae_arranque = false;
+    if (contrato_mqtt::leerSyncAck(payload, hasta_seq, de_arranque, trae_arranque)) {
+      if (!trae_arranque) {
+        de_arranque = arranque;  // acuse sin arranque (simulación o Node-RED viejo): el de ahora
+      }
+      const size_t borrados = cola_eventos::confirmarHasta(de_arranque, hasta_seq);
+      Serial.printf("[nube] Acuse arranque=%lu hasta_seq=%lu: borré %u, quedan %u\n",
+                    static_cast<unsigned long>(de_arranque), static_cast<unsigned long>(hasta_seq),
+                    static_cast<unsigned>(borrados),
                     static_cast<unsigned>(cola_eventos::pendientes()));
     }
   }
@@ -106,7 +112,7 @@ void alMensaje(const char* topico, const char* payload) {
 
 // Evento del propio osito: misma cola con acuse que los de los animales.
 void encolarDelOsito(const char* json, uint32_t seq) {
-  cola_eventos::agregar(seq, protocolo::aEntero(Nodo::Osito), json);
+  cola_eventos::agregar(arranque, seq, protocolo::aEntero(Nodo::Osito), json);
 }
 
 void publicarVolumen(uint32_t ahora_ms) {
@@ -167,10 +173,11 @@ void publicarEstados() {
 void publicarEventos(uint32_t ahora_ms) {
   char topico[config::TOPICO_MAX];
   for (size_t n = 0; n < config::PUBLICAR_POR_VUELTA; ++n) {
+    uint32_t de_arranque = 0;
     uint32_t seq = 0;
     uint8_t nodo = 0;
     const char* json = nullptr;
-    if (!cola_eventos::siguientePorPublicar(seq, nodo, json) ||
+    if (!cola_eventos::siguientePorPublicar(de_arranque, seq, nodo, json) ||
         !contrato_mqtt::topicoEvento(static_cast<Nodo>(nodo), topico, sizeof(topico))) {
       break;
     }
@@ -178,7 +185,7 @@ void publicarEventos(uint32_t ahora_ms) {
     if (!transporte->publicar(topico, json, false)) {
       break;
     }
-    cola_eventos::marcarPublicado(seq);
+    cola_eventos::marcarPublicado(de_arranque, seq);
     ultima_publicacion_ms = ahora_ms;
   }
 }
@@ -186,8 +193,11 @@ void publicarEventos(uint32_t ahora_ms) {
 
 void iniciar(TransporteMqtt& t) {
   transporte = &t;
-  arranque = esp_random() % 1000000;  // 6 dígitos: cabe en el evento más largo
-  cola_eventos::reiniciar();
+  // La cola no se reinicia aquí: cola_persistente ya pudo haber recuperado eventos de antes del
+  // reinicio. El arranque nuevo no debe coincidir con el de ninguno de ellos.
+  do {
+    arranque = esp_random() % 1000000;  // 6 dígitos: cabe en el evento más largo
+  } while (cola_eventos::contieneArranque(arranque));
   transporte->iniciar(alMensaje);
 }
 
@@ -216,10 +226,11 @@ void actualizar() {
   publicarPanel(ahora_ms);
 
   publicarEstados();
+  uint32_t de_arranque = 0;
   uint32_t seq = 0;
   uint8_t nodo = 0;
   const char* json = nullptr;
-  const bool todo_publicado = !cola_eventos::siguientePorPublicar(seq, nodo, json);
+  const bool todo_publicado = !cola_eventos::siguientePorPublicar(de_arranque, seq, nodo, json);
   if (todo_publicado && cola_eventos::pendientes() > 0 &&
       ahora_ms - ultima_publicacion_ms >= config::REPUBLICAR_SIN_ACK_MS) {
     Serial.println("[nube] No llegó el acuse: vuelvo a publicar lo pendiente");
@@ -241,9 +252,9 @@ void alEvento(const animales::Recibido& recibido) {
   if (contrato_mqtt::armarEvento(seq, horaUnix(), evento, json, sizeof(json)) &&
       contrato_mqtt::agregarArranque(json, sizeof(json), arranque)) {
     const uint32_t antes = cola_eventos::descartados();
-    cola_eventos::agregar(seq, protocolo::aEntero(evento.nodo), json);
+    cola_eventos::agregar(arranque, seq, protocolo::aEntero(evento.nodo), json);
     if (cola_eventos::descartados() != antes) {
-      Serial.printf("[nube] Cola llena: descarté el evento más viejo (%lu en total)\n",
+      Serial.printf("[nube] Cola y desborde llenos: descarté un evento (%lu en total)\n",
                     static_cast<unsigned long>(cola_eventos::descartados()));
     }
   }

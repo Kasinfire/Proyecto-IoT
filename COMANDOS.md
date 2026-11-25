@@ -223,3 +223,27 @@ git commit -m "Mensaje"
 git push
 gh pr view 16 --web
 ```
+
+## 9. Supabase (una sola vez)
+
+Sin esto todo funciona igual, pero el historial solo queda en la laptop.
+
+1. En <https://supabase.com> crea un proyecto (plan gratis, región más cercana).
+2. En **SQL Editor** pega el contenido de `nodered/supabase.sql` y dale **Run**.
+3. En **Project Settings → API Keys** copia la *Project URL* y una **secret key** (`sb_secret_…`).
+   Nunca la publishable/anon: con RLS no deja escribir.
+4. Agrégalas al final de `.secrets/mqtt.env` (no se sube a git):
+
+   ```sh
+   nano .secrets/mqtt.env
+   ```
+
+   ```
+   SUPABASE_URL=https://xxxxxxxx.supabase.co
+   SUPABASE_KEY=sb_secret_xxxxxxxx
+   ```
+
+5. Reinicia Node-RED. La primera vez sube todo lo que ya había. Revisa en **Table Editor** que
+   aparezcan `ninos` y `sesiones`.
+
+Los proyectos gratis se pausan tras una semana sin uso: ábrelo en el navegador el día antes de la demo.
