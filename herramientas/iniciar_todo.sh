@@ -64,7 +64,11 @@ PY="$RAIZ/.venv/bin/python"
 if [ "$SONIDO" = 0 ]; then
   echo "Sin sonido, como pediste."
 elif [ ! -e "$PUERTO" ]; then
-  echo "Sin sonido: no está conectado el osito en $PUERTO."
+  # Los puertos cambian al reconectar (el osito ha sido -110 y -210). No se abre ninguno para
+  # adivinar: abrir un puerto reinicia esa placa.
+  echo "SIN SONIDO: el osito no está en $PUERTO. Puertos que veo ahora:" >&2
+  ls /dev/cu.usbserial-* 2>/dev/null | sed 's/^/  /' >&2 || echo "  (ninguno)" >&2
+  echo "Apaga con Ctrl+C y vuelve a correr:  $0 /dev/cu.usbserial-XXX (el del osito)" >&2
 elif ! "$PY" -c 'import serial, numpy, sounddevice' 2>/dev/null; then
   echo "Sin sonido: falta preparar .venv (COMANDOS.md, sección 1)."
 else
