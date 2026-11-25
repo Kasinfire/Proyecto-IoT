@@ -22,6 +22,8 @@ class NubeSupabase {
 
   // op: { op: 'nino', alias, avatar } | { op: 'renombrar', de, a } | { op: 'borrarNino', alias }
   //   | { op: 'sesion', sesion: { id, alias, inicio, fin, modos, cancion, resumen, aviso } }
+  //   | { op: 'cancion', cancion: { id, nombre, tipo, estilo, compas, pulso_ms, melodia, acordes, incluida } }
+  //   | { op: 'borrarCancion', id }
   // Devuelve { resultado, detalle }.
   async enviar(op) {
     const alias = (a) => `alias=eq.${encodeURIComponent(a)}`;
@@ -45,6 +47,17 @@ class NubeSupabase {
         const nino = await this.pedir('POST', 'ninos?on_conflict=alias', [{ alias: s.alias }], true, 'ignore-duplicates');
         return nino.resultado === OK ? subir() : nino;
       }
+      case 'cancion': {
+        const c = op.cancion;
+        const fila = {
+          id: c.id, nombre: c.nombre, tipo: c.tipo, estilo: c.estilo ?? null, compas: c.compas ?? null,
+          pulso_ms: c.pulso_ms, melodia: c.melodia, acordes: c.acordes ?? null, incluida: Boolean(c.incluida),
+          guardado: new Date().toISOString(),
+        };
+        return this.pedir('POST', 'canciones?on_conflict=id', [fila], true);
+      }
+      case 'borrarCancion':
+        return this.pedir('DELETE', `canciones?id=eq.${encodeURIComponent(op.id)}`);
       default:
         return { resultado: DESCARTAR, detalle: `operación desconocida: ${op.op}` };
     }
