@@ -389,7 +389,7 @@ function pintarConexion() {
   if (!hayServidor) resumen = 'Se perdió Node-RED. La música del osito sigue.';
   else if (!hayBroker) resumen = 'El broker no responde. La música del osito sigue.';
   else if (osito === null) resumen = 'Esperando noticias del osito.';
-  else if (!hayOsito) resumen = `El osito está sin red: la música sigue y guarda hasta 64 eventos (tenía ${estado.pendientesOsito}).`;
+  else if (!hayOsito) resumen = `El osito está sin red: la música sigue y guarda los eventos para mandarlos al volver (hasta 4000; tenía ${estado.pendientesOsito}).`;
   else if (ahora < estado.recuperadoHasta) resumen = `El osito volvió con ${estado.recuperados} eventos guardados.`;
   else if (cuantos < otros.length) resumen = `Falta: ${otros.filter(({ id }) => estado.animales[id].conectado !== true).map((a) => a.nombre).join(', ')}.`;
   else resumen = 'Todo conectado.';
