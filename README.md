@@ -59,24 +59,24 @@ Cada animal toca una parte y esa parte solo suena mientras un niño lo está toc
 ## Cómo funciona
 
 ```mermaid
-flowchart LR
-    subgraph percepcion["Percepción"]
-        direction TB
+flowchart TB
+    subgraph percepcion["Percepción: un ESP32 por animal"]
+        direction LR
         gatito["Gatito<br/>7 teclas"]
         ranita["Ranita<br/>fotorresistencia"]
         pollito["Pollito<br/>sensor de inclinación"]
     end
 
-    osito["Osito ESP32<br/>director musical<br/>cola offline en LittleFS"]
+    osito["Osito ESP32<br/>director musical y gateway<br/>cola offline en LittleFS"]
 
     subgraph middleware["Middleware en la laptop"]
-        direction TB
+        direction LR
         broker["Mosquitto<br/>TLS y ACL"]
-        nodered["Node-RED<br/>descifra, confirma<br/>y lleva la sesión"]
+        nodered["Node-RED<br/>descifra, confirma y lleva la sesión"]
     end
 
     subgraph aplicacion["Aplicación"]
-        direction TB
+        direction LR
         terapeuta["Pantalla del terapeuta"]
         nino["Pantalla del niño"]
         sinte["Sintetizador"]
