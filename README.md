@@ -69,7 +69,7 @@ flowchart LR
 
     osito["Osito ESP32<br/>director musical<br/>cola offline en LittleFS"]
 
-    subgraph middleware["Middleware · laptop"]
+    subgraph middleware["Middleware en la laptop"]
         direction TB
         broker["Mosquitto<br/>TLS y ACL"]
         nodered["Node-RED<br/>descifra, confirma<br/>y lleva la sesión"]
@@ -84,10 +84,14 @@ flowchart LR
 
     supabase[("Supabase<br/>historial por alias")]
 
-    gatito & ranita & pollito -->|ESP-NOW cifrado| osito
-    osito -->|MQTTS| broker --> nodered
+    gatito -->|ESP-NOW cifrado| osito
+    ranita -->|ESP-NOW cifrado| osito
+    pollito -->|ESP-NOW cifrado| osito
+    osito -->|MQTTS| broker
+    broker --> nodered
     osito -->|USB serial| sinte
-    nodered -->|WebSocket| terapeuta & nino
+    nodered -->|WebSocket| terapeuta
+    nodered -->|WebSocket| nino
     nodered -.->|HTTPS| supabase
 ```
 
