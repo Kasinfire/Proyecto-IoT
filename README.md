@@ -2,7 +2,7 @@
 
 # Orquesta de animalitos
 
-Cuatro peluches con **ESP32** que tocan juntos una canción, pensados para **musicoterapia infantil**.
+Cuatro **ESP32** que tocan juntos una canción, pensados para **musicoterapia infantil**.
 Cada animal toca una parte y esa parte solo suena mientras un niño lo está tocando: si tocan todos, suena completa.
 
 [![ESP32](https://img.shields.io/badge/ESP32-Arduino%20core%203.3-E7352C?style=flat-square)](firmware)
