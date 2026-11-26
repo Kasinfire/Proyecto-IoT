@@ -14,6 +14,7 @@ const NODOS = ['osito', 'ranita', 'gatito', 'pollito'];
 const ANIMALES = ['gatito', 'ranita', 'pollito'];
 const MODOS = ['cancion', 'libre', 'simon'];
 const INCLUIDAS = arreglo.incluidas(); // las trae el osito en su firmware
+const HUELLA_INCLUIDAS = crypto.createHash('sha256').update(JSON.stringify(INCLUIDAS)).digest('hex').slice(0, 16);
 const CANCION_DIAGNOSTICO = 'prueba';
 const CANCIONES_MAX = 200;
 const TECLAS = '123A456B789C*0#Dd';
@@ -92,6 +93,7 @@ class Orquesta {
       ninos: [], sesiones: [], sesion: null, siguienteId: 1, avisoSilenciado: false,
       modo: 'cancion', cancion: INCLUIDAS[0].id, canciones: [], siguienteCarga: 1, sync: {}, // sync: { [arranque]: { hasta, recibidos, visto } }
       paraLaNube: [], nubeAlDia: false, // operaciones que esperan a que Supabase responda
+      rechazadasNube: [], // las que Supabase no aceptó: se apartan para no detener las demás ni perderlas
     };
     this.conectado = {};
     this.desconectadoDesde = {};
@@ -131,6 +133,18 @@ class Orquesta {
       for (const n of this.datos.ninos) this.alaNube({ op: 'nino', alias: n.alias, avatar: n.avatar ?? null });
       for (const s of this.datos.sesiones) this.alaNube({ op: 'sesion', sesion: s });
       this.datos.nubeAlDia = true;
+    }
+    if (this.nube) {
+      // Las canciones llegaron después: las propias se suben una vez; las incluidas, cada que el
+      // firmware traiga otras (cambia su huella).
+      if (!this.datos.cancionesEnNube) {
+        for (const c of this.datos.canciones) this.alaNube({ op: 'cancion', cancion: c });
+        this.datos.cancionesEnNube = true;
+      }
+      if (this.datos.incluidasEnNube !== HUELLA_INCLUIDAS) {
+        for (const c of INCLUIDAS) this.alaNube({ op: 'cancion', cancion: c });
+        this.datos.incluidasEnNube = HUELLA_INCLUIDAS;
+      }
     }
     // Antes se guardaba el nombre tal cual lo mandaba el osito; ahora es el id.
     if (!this.buscarCancion(this.datos.cancion) && this.datos.cancion !== CANCION_DIAGNOSTICO) {
@@ -378,7 +392,7 @@ class Orquesta {
     // Cada encendido del osito tiene su arranque y sus seq empiezan en 1. Los eventos que el osito
     // guardó antes de reiniciarse llegan con el arranque viejo, así que se lleva la cuenta por arranque.
     const arranque = String(evento.arranque ?? 0);
-    const s = this.syncDe(arranque, evento.seq);
+    const s = this.syncDe(arranque);
     if (evento.seq > s.hasta && !s.recibidos.includes(evento.seq)) {
       s.recibidos.push(evento.seq);
       if (s.recibidos.length > RECIBIDOS_MAX) s.recibidos.shift();
@@ -390,11 +404,12 @@ class Orquesta {
     this.confirmar(arranque, salida);
   }
 
-  // El primer seq que se ve de un arranque nuevo marca dónde empieza.
-  syncDe(arranque, seq) {
+  // Los seq empiezan en 1: si el primero que llega es mayor, los de antes se perdieron en el camino y
+  // el osito los repite. Si ya no los tiene, se siguen tras ESPERA_HUECO_MS.
+  syncDe(arranque) {
     const sync = this.datos.sync;
     if (!sync[arranque]) {
-      sync[arranque] = { hasta: seq - 1, recibidos: [], visto: 0 };
+      sync[arranque] = { hasta: 0, recibidos: [], visto: 0 };
       const claves = Object.keys(sync);
       if (claves.length > ARRANQUES_MAX) {
         const olvidar = claves.filter((k) => k !== arranque).sort((a, b) => sync[a].visto - sync[b].visto)[0];
@@ -615,6 +630,7 @@ class Orquesta {
         if (motivo) return error(400, motivo);
         cancion.id = `m-${crypto.randomBytes(5).toString('hex')}`;
         this.datos.canciones.push(cancion);
+        this.alaNube({ op: 'cancion', cancion });
         this.guardar();
         return resp(200, { id: cancion.id }, [{ tipo: 'canciones' }]);
       }
@@ -625,6 +641,7 @@ class Orquesta {
         if (motivo) return error(400, motivo);
         Object.assign(vieja, cancion);
         if (this.datos.cancion === vieja.id) this.cancionCambiada = true;
+        this.alaNube({ op: 'cancion', cancion: vieja });
         this.guardar();
         return resp(200, { id: vieja.id }, [{ tipo: 'canciones' }]);
       }
@@ -632,6 +649,7 @@ class Orquesta {
         if (!this.datos.canciones.some((c) => c.id === cuerpo.id)) return error(404, 'esa canción no se puede borrar');
         if (this.datos.cancion === cuerpo.id && this.datos.modo === 'cancion') return error(409, 'está sonando: elige otra antes de borrarla');
         this.datos.canciones = this.datos.canciones.filter((c) => c.id !== cuerpo.id);
+        this.alaNube({ op: 'borrarCancion', id: cuerpo.id });
         this.guardar();
         return resp(204, null, [{ tipo: 'canciones' }]);
       }
@@ -728,11 +746,24 @@ class Orquesta {
   // Se guarda con lo demás (antes de responder), así que ni un corte de internet ni reiniciar
   // Node-RED la pierden. Solo se sube lo que deja pasar paraNube(): nunca el nombre ni la nota.
   alaNube(op) {
-    if (!this.nube) return;
+    // Lo apartado sigue al niño: si lo borran no queda nada suyo, y si cambia de alias también cambia.
+    const aliasDe = (r) => r.op.sesion?.alias ?? r.op.alias;
+    if (op.op === 'borrarNino') this.datos.rechazadasNube = this.datos.rechazadasNube.filter((r) => aliasDe(r) !== op.alias);
+    if (op.op === 'renombrar') {
+      for (const r of this.datos.rechazadasNube) {
+        if (r.op.sesion?.alias === op.de) r.op.sesion.alias = op.a;
+        else if (r.op.alias === op.de) r.op.alias = op.a;
+      }
+    }
+    if (op.op === 'borrarCancion') this.datos.rechazadasNube = this.datos.rechazadasNube.filter((r) => r.op.cancion?.id !== op.id);
+    // Si alguna vez hubo nube se anota aunque ahora esté apagada: allá hay datos que borrar o cambiar.
+    if (!this.nube && !this.datos.nubeAlDia) return;
     if (op.op === 'sesion') {
       const [limpia] = paraNube({ ninos: [], sesiones: [op.sesion], canciones: [] }).sesiones;
       op = { op: 'sesion', sesion: limpia };
     }
+    // Copia: si la editan antes de que suba, se sube cada versión en orden.
+    if (op.op === 'cancion') op = { op: 'cancion', cancion: structuredClone(op.cancion) };
     this.datos.paraLaNube.push(op);
   }
 
@@ -753,8 +784,15 @@ class Orquesta {
           this.nubeEspera = Math.min(this.nubeEspera * 2, ESPERA_NUBE_MAX_MS);
           break;
         }
-        if (resultado === DESCARTAR) this.aviso(`Supabase rechazó ${cola[0].op}: ${detalle}`);
-        cola.shift();
+        const hecha = cola.shift();
+        if (resultado === DESCARTAR) {
+          this.aviso(`Supabase rechazó ${hecha.op}: ${detalle}. Queda apartada en esta laptop`);
+          // Si mientras tanto borraron a ese niño, no se guarda nada suyo.
+          const deQuien = hecha.sesion?.alias ?? hecha.alias;
+          if (!cola.some((x) => x.op === 'borrarNino' && x.alias === deQuien)) {
+            this.datos.rechazadasNube.push({ op: hecha, detalle, cuando: this.ahora() });
+          }
+        }
         this.nubeEspera = ESPERA_NUBE_MIN_MS;
         this.guardar();
       }

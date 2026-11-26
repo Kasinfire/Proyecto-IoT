@@ -81,6 +81,21 @@ test('si el hueco ya no existe en el osito, sigue tras la espera', () => {
   assert.match(avisos[0], /2 a 4/);
 });
 
+test('si se pierde el primer evento tras encender, no se da por recibido', () => {
+  const { o, reloj, avisos } = nueva();
+  const primero = o.alMqtt(...nota(2)); // el 1 se perdió en el camino
+  assert.strictEqual(primero.ws.length, 1, 'se muestra enseguida');
+  assert.deepStrictEqual(ack(primero), [], 'sin acuse: borraría el 1 del osito');
+  const repetido = o.alMqtt(...nota(1));
+  assert.strictEqual(repetido.ws.length, 1);
+  assert.deepStrictEqual(ack(repetido), [2]);
+  // Si el osito ya no lo tiene, no se espera para siempre.
+  o.alMqtt(...nota(40, 100, 9));
+  reloj.t += 26000;
+  assert.deepStrictEqual(ack(o.alSegundo()), [40]);
+  assert.match(avisos[0], /1 a 39/);
+});
+
 test('al reiniciarse el osito, seq 1 es nuevo', () => {
   const { o } = nueva();
   o.alMqtt(...nota(1));

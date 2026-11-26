@@ -18,7 +18,7 @@ red: todo lo que suena se decide en el osito.
   número al azar por encendido; Node-RED lleva la cuenta por arranque, así que los eventos que el
   osito recupera tras un reinicio no se confunden con los nuevos.
 - **Nada se borra sin acuse.** Publicar no basta (QoS 0): solo el acuse de Node-RED, que se manda
-  después de guardar.
+  después de guardar. El desborde tampoco se borra de la flash hasta que todo lo suyo tiene acuse.
 - **Al reconectar** el osito vuelve a publicar todo en orden; Node-RED descarta duplicados.
 - **Capacidad:** 64 en RAM + 4000 en flash, unos 30 min sin red a ~2 eventos por segundo.
 - **Con red no se escribe en la flash**: la copia solo se hace cuando los acuses dejan de llegar.
@@ -26,7 +26,7 @@ red: todo lo que suena se decide en el osito.
 Límites honestos:
 
 - Si el desborde también se llena, el evento nuevo se descarta y se cuenta (`orquesta/osito/cola`,
-  campo `descartados`).
+  campo `descartados`). Igual un registro dañado en la flash.
 - Si se va la luz del osito, se pierde lo que entró a la RAM en el último segundo, o en los últimos
   3 s si todavía había red.
 

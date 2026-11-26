@@ -180,7 +180,8 @@ encendido). Solo se borra de la cola cuando Node-RED manda `orquesta/sync/ack` c
 
 - Los primeros 64 eventos pendientes viven en RAM. Lo que no cabe se escribe en orden en
   `/desborde.bin` (LittleFS, hasta `DESBORDE_MAX` = 4000, unos 30 min a 2 eventos/s) y vuelve a la RAM
-  conforme llegan los acuses. Si también se llena, el evento nuevo se descarta y se cuenta en
+  conforme llegan los acuses. El archivo se borra cuando todo lo que salió de él ya tiene acuse; un
+  registro dañado se salta y se cuenta. Si también se llena, el evento nuevo se descarta y se cuenta en
   `orquesta/osito/cola`.
 - Si el evento más viejo lleva 3 s sin acuse (no hay red), la RAM se copia a `/cola.bin` cada segundo.
   Con red no se escribe en la flash. Al encender, `cola_persistente::iniciar()` recupera la copia
@@ -195,6 +196,6 @@ encendido). Solo se borra de la cola cuando Node-RED manda `orquesta/sync/ack` c
 - Node-RED: descifrar el sobre `seq`/`data`, mandar `orquesta/sync/ack` y traducir al WebSocket de
   la interfaz web (PR #13).
 - Las melodías incluidas (`nodered/canciones.json` → `canciones_datos.h` con `herramientas/generar_canciones.mjs`) falta oírlas con los animales.
-- Probar en la placa `cola_persistente` (no hay `arduino-cli` aquí: compilarlo en el IDE con el
-  esquema de particiones *Default 4MB with spiffs*, que deja ~1.5 MB para LittleFS).
+- Probar en la placa `cola_persistente` (compila con `arduino-cli`; partición por defecto, ~1.4 MB para
+  LittleFS) y medir si escribir en la flash sin red traba la música: corre en el mismo ciclo.
 - El gatito todavía usa `enlace_simulado`; `filtro_boton` podría migrar al `Antirrebote` común.
