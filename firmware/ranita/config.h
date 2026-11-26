@@ -23,16 +23,18 @@ constexpr uint8_t ZONA_MUERTA_NIVEL = 12;
 constexpr size_t PROMEDIO_LECTURAS = 4;
 
 // Recalibración mientras funciona (calibracion_luz.h). En lecturas de LECTURA_CADA_MS:
-constexpr uint32_t CALIBRA_SUBIR_LECTURAS = 50;   // ~1 s para seguir una luz más fuerte
+constexpr uint32_t CALIBRA_SUBIR_LECTURAS = 500;  // una luz un poco más fuerte (+4 %) se sigue despacio
+// Una luz mucho más fuerte solo cuenta si se queda estable este tiempo: prender las luces sí, una
+// lámpara de celular en la mano no (medido el 2026-11-26: brincaba entre 3078 y 4095).
+constexpr uint32_t CALIBRA_SUBIR_ESTABLE_MS = 5000;
+// Si después de subir la luz vuelve a la normal de antes y se queda ahí, se regresa a ella.
+constexpr uint32_t CALIBRA_REGRESAR_MS = 2000;
 constexpr uint32_t CALIBRA_BAJAR_LECTURAS = 500;  // ~10 s para seguir una luz que baja, destapada
 // "Tapada" sin moverse este tiempo = apagaron luces, no es una mano: esa luz pasa a ser la normal.
 // Una mano que se queda quieta encima tanto tiempo también cuenta: deja de sonar hasta quitarla.
 constexpr uint32_t CALIBRA_TAPADA_FIJA_MS = 30000;
 constexpr uint8_t CALIBRA_QUIETA_PCT = 4;  // cuánto puede moverse la luz y seguir "quieta"
 constexpr uint16_t CALIBRA_QUIETA_MIN = 25;  // margen fijo por el ruido del ADC con poca luz
-// Desde aquí el ADC está saturado (máximo 4095): una lámpara encima o un cable flojo, no la luz del
-// cuarto. No se toma como normal; si no, después todo parecería "tapado" y sonaría sola.
-constexpr uint16_t LUZ_SATURADA = 4000;
 
 // Cada cuánto imprime luz, luz normal y nivel en el monitor serie, para medir en el salón.
 // 0 = no imprime.
