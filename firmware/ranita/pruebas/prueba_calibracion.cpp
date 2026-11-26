@@ -101,6 +101,30 @@ int main() {
     revisar(!alguna, "con poca luz, el ruido del ADC no la hace sonar");
   }
   {
+    // Lo medido en la placa el 2026-11-26 (cada 2 s): normal ~1800, una lámpara 6 s saturó a 4095,
+    // luego tapada (0) y luego la luz de antes (1775). Antes la normal subía a 4080 y quedaba sonando.
+    CalibracionLuz c;
+    uint32_t t = 0;
+    c.empezar(1798, t);
+    correr(c, t, 2000, [](uint32_t) { return ruido(1750, 30); });
+    correr(c, t, 6000, [](uint32_t) { return static_cast<uint16_t>(4095); });
+    revisar(c.normal() < 1900, "una lampara encima (4095) no cambia la luz normal");
+    correr(c, t, 4000, [](uint32_t) { return static_cast<uint16_t>(0); });
+    correr(c, t, 2000, [](uint32_t) { return ruido(1775, 30); });
+    bool sola = false;
+    for (int i = 0; i < 200; ++i) sola |= !destapada(ruido(1775, 30), c.normal());
+    revisar(!sola, "al quitarla, con la luz de antes no suena sola");
+    revisar(!destapada(800, c.normal()), "y una mano sigue contando");
+  }
+  {
+    // Si de verdad prenden mucha luz (sin saturar), la normal sí la sigue.
+    CalibracionLuz c;
+    uint32_t t = 0;
+    c.empezar(1800, t);
+    correr(c, t, 5000, [](uint32_t) { return ruido(3500, 30); });
+    revisar(c.normal() > 3400, "mas luz de verdad (3500): la normal la sigue");
+  }
+  {
     CalibracionLuz c;
     uint32_t t = 0xFFFFF000u;  // millis() a punto de desbordar
     c.empezar(2000, t);

@@ -30,6 +30,9 @@ constexpr uint32_t CALIBRA_BAJAR_LECTURAS = 500;  // ~10 s para seguir una luz q
 constexpr uint32_t CALIBRA_TAPADA_FIJA_MS = 30000;
 constexpr uint8_t CALIBRA_QUIETA_PCT = 4;  // cuánto puede moverse la luz y seguir "quieta"
 constexpr uint16_t CALIBRA_QUIETA_MIN = 25;  // margen fijo por el ruido del ADC con poca luz
+// Desde aquí el ADC está saturado (máximo 4095): una lámpara encima o un cable flojo, no la luz del
+// cuarto. No se toma como normal; si no, después todo parecería "tapado" y sonaría sola.
+constexpr uint16_t LUZ_SATURADA = 4000;
 
 // Cada cuánto imprime luz, luz normal y nivel en el monitor serie, para medir en el salón.
 // 0 = no imprime.

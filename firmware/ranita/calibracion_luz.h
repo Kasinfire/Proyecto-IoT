@@ -4,6 +4,7 @@
 // - Si hay más luz que la normal, nadie la está tapando: la normal sube rápido (~1 s). Así se
 //   corrige sola si se encendió tapada o si prenden más luces.
 // - Destapada, la normal baja despacio (~10 s): sigue cambios lentos, como la luz de la tarde.
+// - Una lectura saturada (lámpara o cable flojo) no mueve la normal.
 // - Si parece tapada pero la luz no se mueve durante CALIBRA_TAPADA_FIJA_MS, no es una mano (una
 //   mano siempre tiembla un poco): apagaron luces. Esa luz pasa a ser la normal.
 #pragma once
@@ -26,6 +27,10 @@ class CalibracionLuz {
   // Una lectura (ya promediada) cada LECTURA_CADA_MS. destapada: el nivel calculado es 0.
   // true si acaba de recalibrar de golpe porque la luz del cuarto bajó.
   bool actualizar(uint16_t luz, bool destapada, uint32_t ahora_ms) {
+    if (luz >= config::LUZ_SATURADA) {
+      reiniciarQuieta(luz, ahora_ms);
+      return false;
+    }
     const uint32_t luz_x16 = static_cast<uint32_t>(luz) * 16;
     if (luz_x16 > normal_x16_) {
       normal_x16_ += (luz_x16 - normal_x16_) / config::CALIBRA_SUBIR_LECTURAS;
