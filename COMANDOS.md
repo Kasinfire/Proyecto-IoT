@@ -196,6 +196,20 @@ Canciones del firmware al día (sin `--revisar` las vuelve a generar):
 node herramientas/generar_canciones.mjs --revisar
 ```
 
+Capturas del README (`docs/capturas/`), en modo ensayo y sin placas. Con un servidor de la carpeta `web/`
+corriendo (`python3 -m http.server 8765 --directory web`), en otra terminal:
+
+```sh
+for p in en-vivo historial ninos canciones proyector; do
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless=new --hide-scrollbars \
+    --force-device-scale-factor=1.5 --window-size=1440,900 --virtual-time-budget=8000 \
+    --screenshot="docs/capturas/$p.png" "http://127.0.0.1:8765/$p.html?ensayo"
+done
+```
+
+El proyector se ve completo con `--window-size=1440,810`. La matriz de pruebas de estrés con las placas
+está en [`docs/pruebas/matriz-estres.md`](docs/pruebas/matriz-estres.md).
+
 ## 7. Diagnóstico
 
 ¿El osito está en el broker? Debe salir una IP que no sea `127.0.0.1`:
