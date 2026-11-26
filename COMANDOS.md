@@ -70,6 +70,12 @@ lsof -nP -iTCP:1880 -iTCP:8883 -sTCP:LISTEN
 kill PID
 ```
 
+Si el 8883 lo ocupa el Mosquitto de Homebrew corriendo como servicio (usa otro certificado), detenlo:
+
+```sh
+brew services stop mosquitto
+```
+
 Quién ocupa el puerto serie del osito:
 
 ```sh
