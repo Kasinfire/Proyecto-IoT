@@ -9,7 +9,6 @@ Cada animal toca una parte y esa parte solo suena mientras un niño lo está toc
 [![Red](https://img.shields.io/badge/red-ESP--NOW%20%C2%B7%20MQTTS-4A4A4A?style=flat-square)](orquesta-proyecto.md)
 [![Middleware](https://img.shields.io/badge/middleware-Mosquitto%20%C2%B7%20Node--RED-8F0000?style=flat-square)](nodered)
 [![Nube](https://img.shields.io/badge/nube-Supabase-3ECF8E?style=flat-square)](nodered/supabase.sql)
-[![Curso](https://img.shields.io/badge/UdeG-CUCEI-1F3A93?style=flat-square)](#)
 
 <img src="docs/capturas/en-vivo.png" alt="Pantalla En vivo del terapeuta durante una sesión" width="100%">
 
@@ -187,4 +186,3 @@ Proyecto-IoT/
 La especificación completa está en [`orquesta-proyecto.md`](orquesta-proyecto.md) y el estándar de código en
 [`docs/estandar-codigo.md`](docs/estandar-codigo.md). Cada integrante trabaja en su rama y la integra a `main` con un pull request.
 
-Proyecto final de **Internet de las Cosas**, Universidad de Guadalajara
