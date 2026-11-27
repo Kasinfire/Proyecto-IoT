@@ -47,8 +47,8 @@ int main() {
     CalibracionLuz c;
     uint32_t t = 0;
     c.empezar(600, t);
-    correr(c, t, 5000, [](uint32_t) { return ruido(2000, 30); });
-    revisar(c.normal() > 1900, "encendida tapada: al destaparla la normal sube a la luz real");
+    correr(c, t, 7000, [](uint32_t) { return ruido(2000, 30); });
+    revisar(c.normal() > 1900, "encendida tapada: al destaparla la normal sube (en ~5 s)");
   }
   {
     CalibracionLuz c;
@@ -101,28 +101,49 @@ int main() {
     revisar(!alguna, "con poca luz, el ruido del ADC no la hace sonar");
   }
   {
-    // Lo medido en la placa el 2026-11-26 (cada 2 s): normal ~1800, una lámpara 6 s saturó a 4095,
-    // luego tapada (0) y luego la luz de antes (1775). Antes la normal subía a 4080 y quedaba sonando.
+    // Medido en la placa el 2026-11-26, cada 2 s: normal ~1730, mano, y una lámpara de celular
+    // que brinca entre 3078 y 4095; al quitarla, la luz de antes (~1720). Entre lecturas se
+    // mueve como se movía la mano: se interpola y se agrega ruido.
+    const uint16_t medido[] = {1757, 1743, 1724, 1726, 1704, 1709, 1721, 1707, 1717, 1691, 675, 1735,
+                               116, 1609, 670, 1717, 3544, 3775, 1762, 1718, 4095, 4094, 3078,
+                               4001, 3422, 1700, 1700, 1719, 1725, 1720, 1718, 1722};
     CalibracionLuz c;
     uint32_t t = 0;
-    c.empezar(1798, t);
-    correr(c, t, 2000, [](uint32_t) { return ruido(1750, 30); });
-    correr(c, t, 6000, [](uint32_t) { return static_cast<uint16_t>(4095); });
-    revisar(c.normal() < 1900, "una lampara encima (4095) no cambia la luz normal");
-    correr(c, t, 4000, [](uint32_t) { return static_cast<uint16_t>(0); });
-    correr(c, t, 2000, [](uint32_t) { return ruido(1775, 30); });
-    bool sola = false;
-    for (int i = 0; i < 200; ++i) sola |= !destapada(ruido(1775, 30), c.normal());
-    revisar(!sola, "al quitarla, con la luz de antes no suena sola");
+    c.empezar(1720, t);
+    const size_t n = sizeof(medido) / sizeof(medido[0]);
+    bool sono_mano = false;
+    size_t sola_despues = 0;
+    for (size_t i = 0; i + 1 < n; ++i) {
+      correr(c, t, 2000, [&](uint32_t ms) {
+        const uint32_t k = ms % 2000;
+        const int l = medido[i] + (static_cast<int>(medido[i + 1]) - medido[i]) * static_cast<int>(k) / 2000;
+        return ruido(static_cast<uint16_t>(l < 30 ? 30 : l > 4065 ? 4065 : l), 30);
+      });
+      if (i == 10) sono_mano = !destapada(675, c.normal());
+      if (i >= 26) sola_despues += destapada(medido[i], c.normal()) ? 0 : 1;
+    }
+    revisar(sono_mano, "medido: la mano si suena");
+    revisar(c.normal() < 1900, "medido: la lampara del celular no cambia la luz normal");
+    revisar(sola_despues == 0, "medido: al quitar la lampara no suena sola");
+  }
+  {
+    // Lámpara quieta 6 s (sí parece luz del cuarto) y luego vuelve la de antes: regresa enseguida.
+    CalibracionLuz c;
+    uint32_t t = 0;
+    c.empezar(1720, t);
+    correr(c, t, 6000, [](uint32_t) { return ruido(3500, 20); });
+    revisar(c.normal() > 3300, "una luz fuerte que se queda quieta 5 s si se toma");
+    correr(c, t, 3000, [](uint32_t) { return ruido(1720, 20); });
+    revisar(c.normal() < 1800, "si vuelve la luz de antes, regresa a ella en ~2 s");
     revisar(!destapada(800, c.normal()), "y una mano sigue contando");
   }
   {
-    // Si de verdad prenden mucha luz (sin saturar), la normal sí la sigue.
+    // Prenden más luces de verdad: se sigue.
     CalibracionLuz c;
     uint32_t t = 0;
     c.empezar(1800, t);
-    correr(c, t, 5000, [](uint32_t) { return ruido(3500, 30); });
-    revisar(c.normal() > 3400, "mas luz de verdad (3500): la normal la sigue");
+    correr(c, t, 7000, [](uint32_t) { return ruido(3500, 30); });
+    revisar(c.normal() > 3400, "mas luz de verdad (3500, quieta): la normal la sigue");
   }
   {
     CalibracionLuz c;
